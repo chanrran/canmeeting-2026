@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260920c">
+<link rel="stylesheet" href="style.css?v=20260920e">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -16,9 +16,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260920c"></script>
-<script src="config.js?v=20260920c"></script>
-<script src="app.js?v=20260920c"></script>
+<script src="qrcode.js?v=20260920e"></script>
+<script src="config.js?v=20260920e"></script>
+<script src="app.js?v=20260920e"></script>
 <script>
 (function () {
   'use strict';
@@ -80,9 +80,10 @@
   function render() {
     if (!V.state) return;
     const st = V.state.stage;
-    const out = draw(st);
+    const brk = !!V.state.breakOn;
+    const out = brk ? drawBreak() : draw(st);
     const html = '<div class="s-stage ' + out.cls + '">' + out.html + '</div>';
-    const vk = viewKey(st);
+    const vk = brk ? 'break' : viewKey(st);
     const newView = vk !== V.lastVk;
     if (newView) V.seen = {};
     if (html !== V.lastHtml) {
@@ -105,7 +106,7 @@
       enhance(el);
     }
     V.lastVk = vk;
-    const corner = st === 'title' || st === 'manual_person' || st === 'farewell' ? '' : (st === 'lobby' ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>');
+    const corner = brk ? '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>' : st === 'title' || st === 'manual_person' || st === 'farewell' ? '' : (st === 'lobby' ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>');
     if (corner !== V.lastCorner) { V.lastCorner = corner; $corner.innerHTML = corner; }
   }
 
@@ -159,6 +160,10 @@
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
     return m ? Number(m[1]) + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일' : '';
   }
+  /* 쉬는 시간: 진행자 화면 버튼으로 아무 때나 띄움 */
+  function drawBreak() {
+    return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">Break</div>' };
+  }
   function drawTitle() {
     const meta = [fmtDate(CONFIG.EVENT_DATE), CONFIG.TEAM_NAME].filter(Boolean).join(' · ');
     return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">' + e(CONFIG.EVENT_SUBTITLE) + '</div><div class="rule"></div>' + (meta ? '<div class="meta">' + e(meta) + '</div>' : '') + '<div class="opening">Opening</div>' };
@@ -183,7 +188,7 @@
     if (withPraise) {
       const round = V.state.praiseRound;
       const sent = App.members.reduce((a, m) => a + App.done.praiseSent(R(m.id), round), 0);
-      praiseHtml = '<div class="count"><small>칭찬</small><em>' + sent + '</em> / ' + N * 2 + '</div>';
+      praiseHtml = '<div class="count"><small>칭찬</small><em>' + sent + '</em> / ' + App.praiseTotal(V.state) + '</div>';
     }
     return {
       cls: 's-input',
