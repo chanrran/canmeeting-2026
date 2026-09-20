@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <title>진행자 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="../style.css?v=20260920c">
+<link rel="stylesheet" href="../style.css?v=20260920e">
 </head>
 <body class="h">
 <div id="root"></div>
@@ -14,8 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="../config.js?v=20260920c"></script>
-<script src="../app.js?v=20260920c"></script>
+<script src="../config.js?v=20260920e"></script>
+<script src="../app.js?v=20260920e"></script>
 <script>
 (function () {
   'use strict';
@@ -55,16 +55,21 @@
       H.state = App.withDefaults(d);
       renderSide(); renderCtx(); renderAssign(); renderStatus(); fillClosingOnce();
     });
-    App.db.watchCol('responses', (list) => { H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); });
-    App.db.watchCol('praises', (list) => { H.praises = list; renderStatus(); renderCtx(); renderAssign(); });
+    App.db.watchCol('responses', (list) => { H.respLoaded = true; H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); });
+    App.db.watchCol('praises', (list) => { H.praisesLoaded = true; H.praises = list; renderStatus(); renderCtx(); renderAssign(); });
     App.db.watchDoc('teamManual/current', (d) => { H.team = d; renderCtx(); fillResultOnce(); });
   });
   const setState = (patch) => App.db.set('session/state', patch);
+  /* 배정표는 통째로 바꿔야 함(합치기 저장이면 빠진 사람의 예전 배정이 남음): 비운 뒤 새로 저장 */
+  const setAssignments = async (map, extra) => {
+    await App.db.set('session/state', { praiseAssignments: null });
+    await App.db.set('session/state', Object.assign({ praiseAssignments: map }, extra || {}));
+  };
 
   /* ---------------- 단계 이동 ---------------- */
   function go(k) {
     const st = H.state;
-    const patch = { stage: k };
+    const patch = { stage: k, breakOn: false };
     if (k === 'emotion_person' && !st.emotionCurrent) patch.emotionCurrent = st.emotionOrder[0];
     if (k === 'manual_person' && !st.manualCurrent) { patch.manualCurrent = st.manualOrder[0]; patch.manualRevealed = false; }
     if (k === 'input_manual' && !st.praiseAssignments) { patch.praiseAssignments = App.makeAssignments(); patch.praiseRound = App.now(); }
@@ -76,8 +81,10 @@
     $('side').innerHTML = '<h2>진행 단계 (점선 = 입력 시간)</h2>' +
       App.STAGES.map((s) => '<button type="button" class="stage-btn' + (s.input || s.key === 'lobby' ? ' input' : '') + (s.key === st.stage ? ' on' : '') + '" data-k="' + s.key + '"><span class="t">' + s.time + '</span><span>' + e(s.name) + '</span></button>').join('') +
       '<div class="nav"><button type="button" class="hb" id="prev"' + (i <= 0 ? ' disabled' : '') + '>◀ 이전 단계</button><button type="button" class="hb solid" id="next"' + (i >= App.STAGES.length - 1 ? ' disabled' : '') + '>다음 단계 ▶</button></div>' +
-      '<p class="note" style="margin-top:10px">휴식 시간에는 단계를 그대로 두면 됩니다.</p>';
+      '<button type="button" class="hb big brk' + (st.breakOn ? ' on' : '') + '" id="brk">' + (st.breakOn ? '쉬는 시간 끝내기 (원래 화면으로)' : '☕ 쉬는 시간 화면 띄우기') + '</button>' +
+      '<p class="note" style="margin-top:6px">' + (st.breakOn ? '지금 큰 화면에 쉬는 시간 화면이 나오고 있습니다. 단계 버튼을 눌러도 쉬는 시간이 끝납니다.' : '언제든 누르면 큰 화면만 쉬는 시간 화면으로 바뀝니다. 지금 단계와 휴대폰 화면은 그대로 유지됩니다.') + '</p>';
     $('side').querySelectorAll('.stage-btn').forEach((b) => (b.onclick = () => go(b.dataset.k)));
+    $('brk').onclick = () => setState({ breakOn: !st.breakOn });
     $('prev').onclick = () => go(App.STAGES[i - 1].key);
     $('next').onclick = () => go(App.STAGES[i + 1].key);
   }
@@ -156,7 +163,7 @@
         h += '<p class="desc">' + N + '명의 곡선이 겹쳐 보입니다. 큰 화면 오른쪽 카드 세 개(가장 좋았던 달·힘들었던 달·엇갈린 달)를 누르면 그 달의 이유가 펼쳐집니다.</p>'; break;
       case 'input_manual': {
         const sent = App.members.reduce((a, m) => a + App.done.praiseSent(R[m.id], st.praiseRound), 0);
-        h += '<p class="desc">설명서 제출 ' + cnt(App.done.manual) + '/' + N + ' · 칭찬 ' + sent + '/' + N * 2 + '</p>' +
+        h += '<p class="desc">설명서 제출 ' + cnt(App.done.manual) + '/' + N + ' · 칭찬 ' + sent + '/' + App.praiseTotal(st) + '</p>' +
           '<p class="note">칭찬할 두 분은 이 단계에 들어올 때 자동으로 배정되었습니다. 발표로 넘어가기 전에 "누구의 설명서일까" 순서를 무작위로 섞어 두세요.</p>'; break;
       }
       case 'manual_person': {
@@ -227,7 +234,8 @@
       const mnDone = App.done.manual(r);
       const mnPart = !mnDone && r && r.manual ? '작성 중' : '';
       const pr = App.done.praiseSent(r, round);
-      const need = (H.state.praiseAssignments && H.state.praiseAssignments[m.id] || []).length || 2;
+      const myA = H.state.praiseAssignments && H.state.praiseAssignments[m.id];
+      const need = myA ? myA.length : App.praisePer(App.members.length);
       if (App.done.joined(r)) tot.j++;
       if (App.done.yearWord(r)) tot.y++;
       if (App.done.emotion(r)) tot.em++;
@@ -239,20 +247,41 @@
     });
     const N = App.members.length;
     $('status').innerHTML = '<table class="status"><thead><tr><th>이름</th><th>접속</th><th>올해 한 단어</th><th>감정 곡선</th><th>사용설명서</th><th>칭찬</th><th>내년 키워드</th></tr></thead><tbody>' + rows +
-      '</tbody><tfoot><tr><td>합계</td><td>' + tot.j + '/' + N + '</td><td>' + tot.y + '/' + N + '</td><td>' + tot.em + '/' + N + '</td><td>' + tot.mn + '/' + N + '</td><td>' + tot.pr + '/' + N * 2 + '</td><td>' + tot.nx + '/' + N + '</td></tr></tfoot></table>';
+      '</tbody><tfoot><tr><td>합계</td><td>' + tot.j + '/' + N + '</td><td>' + tot.y + '/' + N + '</td><td>' + tot.em + '/' + N + '</td><td>' + tot.mn + '/' + N + '</td><td>' + tot.pr + '/' + App.praiseTotal(H.state) + '</td><td>' + tot.nx + '/' + N + '</td></tr></tfoot></table>';
   }
 
   /* ---------------- 칭찬 배정 ---------------- */
   let reassignArmed = false;
+  /* 명단이 바뀌면 자동으로 배정을 다시 맞춤: 모두 정확히 2개씩 받도록, 이미 쓴 칭찬은 유지 */
+  let repairing = false;
+  async function autoRepair() {
+    if (repairing || !H.respLoaded || !H.praisesLoaded) return;
+    repairing = true;
+    try {
+      const st = H.state, round = st.praiseRound;
+      const sentBy = {};
+      Object.keys(H.resp).forEach((id) => { const p = H.resp[id].praise; if (p && p.round === round) sentBy[id] = p.sentTo || []; });
+      const nm = App.repairAssignments(st.praiseAssignments, sentBy);
+      if (!nm) { App.showError('명단에 맞춰 칭찬 배정을 자동으로 맞추지 못했습니다. 칭찬 배정의 "다시 배정"을 눌러 주세요(작성된 칭찬이 지워집니다).'); return; }
+      await setAssignments(nm);
+      /* 명단에서 빠진 분에게 간 칭찬은 지우고, 각자의 '보낸 칭찬' 기록도 새 배정에 맞춤 */
+      for (const p of H.praises) if (p.round === round && !App.memberIds.includes(p.toId)) await App.db.del('praises/' + p.id);
+      for (const id of Object.keys(sentBy)) {
+        if (!App.memberIds.includes(id)) continue;
+        const keep = sentBy[id].filter((b) => (nm[id] || []).includes(b));
+        if (keep.length !== sentBy[id].length) await App.db.set('responses/' + id, { praise: { round: round, sentTo: keep } });
+      }
+    } finally { setTimeout(() => { repairing = false; }, 1500); }
+  }
   function renderAssign() {
     if (!H.state) return;
     const st = H.state;
     const has = !!st.praiseAssignments;
     const written = H.praises.filter((p) => p.round === st.praiseRound).length;
     $('assign').innerHTML = '<h2>칭찬 배정</h2>' +
-      '<p class="desc">' + (has ? '배정 완료 · 각자 두 분에게 씁니다 · 지금까지 ' + written + '건 작성' : '아직 배정하지 않았습니다. "사용설명서 + 칭찬 입력" 단계로 넘어가면 자동으로 배정됩니다.') + '</p>' +
+      '<p class="desc">' + (has ? '배정 완료 · 모두 ' + App.praisePer(App.members.length) + '개씩 받습니다 · 지금까지 ' + written + '건 작성' : '아직 배정하지 않았습니다. "사용설명서 + 칭찬 입력" 단계로 넘어가면 자동으로 배정됩니다.') + '</p>' +
       (has && (Object.keys(st.praiseAssignments).length !== App.members.length || App.memberIds.some((id) => !st.praiseAssignments[id]))
-        ? '<div class="warnline">참가자 명단이 배정 뒤에 바뀌었습니다. "다시 배정"을 눌러 주세요.</div>' : '') +
+        ? (autoRepair(), '<div class="warnline">참가자 명단이 바뀌어 칭찬 배정을 다시 맞추고 있습니다. 이미 쓴 칭찬은 그대로 유지됩니다.</div>') : '') +
       '<p class="note">누가 누구에게 쓰는지는 이 화면에도 표시하지 않습니다.</p>' +
       '<div class="tools"><button type="button" class="hb ' + (reassignArmed ? 'danger solid' : '') + '" id="ra">' +
       (has ? (reassignArmed ? '정말 다시 배정할까요? 작성된 칭찬 ' + written + '건이 지워집니다 — 한 번 더 누르세요' : '다시 배정') : '지금 배정') + '</button></div>';
@@ -260,7 +289,7 @@
       if (has && written > 0 && !reassignArmed) { reassignArmed = true; renderAssign(); setTimeout(() => { reassignArmed = false; renderAssign(); }, 6000); return; }
       reassignArmed = false;
       if (has) await App.db.delCol('praises');
-      await setState({ praiseAssignments: App.makeAssignments(), praiseRound: App.now(), revealedPraises: [], praiseTarget: null });
+      await setAssignments(App.makeAssignments(), { praiseRound: App.now(), revealedPraises: [], praiseTarget: null });
     };
   }
 
