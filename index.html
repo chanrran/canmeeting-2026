@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAFBFC">
+<title>우리 팀 사용설명서</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="p">
+<div class="p-shell">
+  <header class="p-top"><span class="me" id="me">우리 팀 사용설명서</span><span class="saved" id="saved"></span></header>
+  <main class="p-main" id="view"><p class="sub" style="text-align:center;margin-top:40vh">불러오는 중입니다…</p></main>
+  <footer class="p-foot" id="foot" hidden><button type="button" class="linkbtn" id="logout">다른 이름으로 로그인</button></footer>
+</div>
+<div class="p-toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  'use strict';
+  const e = App.esc;
+  const $view = document.getElementById('view');
+  const $me = document.getElementById('me');
+  const $saved = document.getElementById('saved');
+  const $foot = document.getElementById('foot');
+  const $toast = document.getElementById('toast');
+
+  const S = {
+    me: null, state: null, resp: null, respLoaded: false, all: null,
+    sub: {}, viewKey: null, prevStage: null, pick: null, savers: [],
+    unwatchMe: null, unwatchAll: null
+  };
+  const saved = App.ls.get('canmeeting_me', null);
+  S.me = App.member(saved) ? saved : null;
+
+  /* ---------------- 저장 ---------------- */
+  function setSaved(t, ok) { $saved.textContent = t; $saved.classList.toggle('ok', !!ok); }
+  function saveResp(patch) {
+    if (!S.me) return Promise.resolve();
+    patch.updatedAt = App.now();
+    setSaved('저장 중…');
+    return App.db.set('responses/' + S.me, patch).then(
+      () => { setSaved('저장됨 ✓', true); },
+      () => { setSaved(''); App.showError('저장되지 않았습니다. 다시 시도해 주세요.'); });
+  }
+  function saver(fn) { const d = App.debounce(fn, 800); S.savers.push(d); return d; }
+  function flushSaves() { S.savers.forEach((d) => d.flush()); S.savers = []; }
+  window.addEventListener('pagehide', flushSaves);
+
+  function toast(t) {
+    $toast.textContent = t; $toast.classList.add('on');
+    clearTimeout(toast.t); toast.t = setTimeout(() => $toast.classList.remove('on'), 2000);
+  }
+
+  /* ---------------- 시작 ---------------- */
+  App.demoBadge();
+  App.ready.then(() => {
+    App.watchMembers(() => {
+      if (S.me && !App.member(S.me)) { S.me = null; App.ls.del('canmeeting_me'); if (S.unwatchMe) S.unwatchMe(); }
+      rerender();
+    });
+    App.db.watchDoc('session/state', (d) => { S.state = App.withDefaults(d); onStage(); render(); });
+    if (S.me) watchMe();
+  });
+
+  function watchMe() {
+    if (S.unwatchMe) S.unwatchMe();
+    S.respLoaded = false;
+    S.unwatchMe = App.db.watchDoc('responses/' + S.me, (d) => { S.resp = d || {}; S.respLoaded = true; render(); });
+  }
+
+  function onStage() {
+    const st = S.state.stage;
+    if (st === S.prevStage) return;
+    if (S.prevStage != null) { flushSaves(); toast('다음 단계로 넘어갔습니다'); }
+    S.prevStage = st;
+    S.sub = {};
+    if (st === 'closing' && !S.unwatchAll) {
+      S.unwatchAll = App.db.watchCol('responses', (list) => { S.all = list; render(); });
+    } else if (st !== 'closing' && S.unwatchAll) { S.unwatchAll(); S.unwatchAll = null; S.all = null; }
+  }
+
+  document.getElementById('logout').onclick = () => {
+    flushSaves();
+    if (S.unwatchMe) S.unwatchMe();
+    S.me = null; S.resp = null; S.respLoaded = false; S.pick = null;
+    App.ls.del('canmeeting_me');
+    rerender();
+  };
+
+  /* ---------------- 화면 고르기 ---------------- */
+  function rerender() { S.viewKey = null; render(); }
+  function render() {
+    if (!S.state) return;
+    const v = pickView();
+    if (!v) return;
+    if (v.key === S.viewKey) return;
+    flushSaves();
+    S.viewKey = v.key;
+    $me.textContent = S.me ? App.label(S.me) : '우리 팀 사용설명서';
+    $foot.hidden = !S.me;
+    setSaved('');
+    $view.innerHTML = '';
+    $view.classList.remove('view-in');
+    v.draw($view);
+    void $view.offsetWidth;
+    $view.classList.add('view-in');
+    window.scrollTo(0, 0);
+  }
+
+  function pendingPraise() {
+    const a = S.state.praiseAssignments && S.state.praiseAssignments[S.me];
+    if (!a) return 0;
+    return Math.max(0, a.length - App.done.praiseSent(S.resp, S.state.praiseRound));
+  }
+
+  function pickView() {
+    if (!S.me) return { key: 'login', draw: drawLogin };
+    if (!S.respLoaded) return null;
+    const st = S.state;
+    const cur = (id) => App.nim(id);
+    switch (st.stage) {
+      case 'title':
+        return info('title', '반갑습니다', App.nim(S.me), '곧 시작합니다. 큰 화면을 봐 주세요');
+      case 'lobby':
+        return wordView('yearWord', '2026년, 올해를 한 단어로', '떠오르는 단어 하나면 됩니다');
+      case 'input_emotion':
+        return emotionView();
+      case 'emotion_person':
+        if (st.emotionCurrent === S.me) return { key: 'emo-mine', draw: drawEmotionMine };
+        return st.emotionCurrent
+          ? info('emo-' + st.emotionCurrent, '지금은', cur(st.emotionCurrent) + ' 발표 중', '큰 화면을 봐 주세요')
+          : info('emo-wait', '지금은', '감정 곡선 발표', '곧 시작합니다. 큰 화면을 봐 주세요');
+      case 'emotion_team':
+        return info('team', '지금은', '우리 팀의 2026년', '큰 화면을 봐 주세요');
+      case 'input_manual':
+        return manualView();
+      case 'manual_person': {
+        if (S.sub.praiseOverride) return praiseWriteView(true);
+        const n = pendingPraise();
+        if (!st.manualRevealed || !st.manualCurrent)
+          return info('guess-' + st.manualCurrent + '-' + n, '지금은', '누구의 설명서일까요?', '큰 화면을 보고 맞혀 보세요', n);
+        if (st.manualCurrent === S.me) return { key: 'man-mine', draw: drawManualMine };
+        return info('man-' + st.manualCurrent + '-' + n, '지금은', cur(st.manualCurrent) + ' 발표 중', '큰 화면을 봐 주세요', n);
+      }
+      case 'praise': {
+        if (!st.praiseTarget) return info('praise-start', '지금은', '칭찬을 공개합니다', '큰 화면을 함께 봐 주세요');
+        if (st.praiseTarget === S.me) {
+          const mine = (st.revealedPraises || []).filter((p) => p.toId === S.me);
+          return { key: 'mypraise-' + mine.map((p) => p.id).join(','), draw: (el) => drawMyPraise(el, mine) };
+        }
+        return info('praise-' + st.praiseTarget, '지금은', cur(st.praiseTarget) + '에게 도착한 칭찬', '큰 화면을 함께 봐 주세요');
+      }
+      case 'team_manual':
+        return info('teammanual', '지금은', '우리 팀 사용설명서', '큰 화면을 봐 주세요');
+      case 'input_keyword':
+        return wordView('nextYearWord', '2027년, 나의 한 단어', '내년에 붙잡고 싶은 단어 하나면 됩니다');
+      case 'closing': {
+        const words = (S.all || []).filter((r) => App.member(r.id)).map((r) => r.nextYearWord).filter(Boolean);
+        return { key: 'closing-' + JSON.stringify(words), draw: (el) => drawClosing(el, words) };
+      }
+      case 'farewell':
+        return info('farewell', '지금은', '담당님 마무리 인사', '오늘 함께해 주셔서 고맙습니다');
+    }
+    return info('unknown', '지금은', '잠시 기다려 주세요', '');
+  }
+
+  /* ---------------- 로그인 ---------------- */
+  function drawLogin(el) {
+    el.innerHTML =
+      '<h1>내 이름을 눌러 주세요</h1>' +
+      '<div class="names">' + App.members.map((m) =>
+        '<button type="button" data-id="' + m.id + '" aria-pressed="' + (S.pick === m.id) + '">' + e(m.label) + '</button>').join('') + '</div>' +
+      '<button type="button" class="btn" id="go" disabled>이름을 먼저 골라 주세요</button>';
+    const go = el.querySelector('#go');
+    const sync = () => {
+      el.querySelectorAll('.names button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === S.pick)));
+      go.disabled = !S.pick;
+      go.textContent = S.pick ? App.nim(S.pick) + '으로 시작하기' : '이름을 먼저 골라 주세요';
+    };
+    el.querySelectorAll('.names button').forEach((b) => (b.onclick = () => { S.pick = b.dataset.id; sync(); }));
+    sync();
+    go.onclick = () => {
+      S.me = S.pick;
+      App.ls.set('canmeeting_me', S.me);
+      saveResp({ joinedAt: App.now() });
+      watchMe();
+      rerender();
+      toast(App.nim(S.me) + '으로 접속했습니다');
+    };
+  }
+
+  /* ---------------- 안내 카드 ---------------- */
+  function info(key, s1, big, s2, pending) {
+    return {
+      key: 'info-' + key,
+      draw: (el) => {
+        el.innerHTML = '<div class="info"><div class="info-card"><div class="s1">' + e(s1) + '</div><div class="big">' + e(big) + '</div><div class="s2">' + e(s2) + '</div></div>' +
+          (pending ? '<div class="nudge"><span>보내지 않은 칭찬이 ' + pending + '건 있습니다</span><button type="button" id="more">마저 쓰기</button></div>' : '') + '</div>';
+        const more = el.querySelector('#more');
+        if (more) more.onclick = () => { S.sub.praiseOverride = true; rerender(); };
+      }
+    };
+  }
+
+  /* ---------------- 한 단어 ---------------- */
+  function wordView(field, title, sub) {
+    if (!S.sub[field]) S.sub[field] = S.resp[field] ? 'done' : 'form';
+    return {
+      key: 'word-' + field + '-' + S.sub[field],
+      draw: (el) => {
+        if (S.sub[field] === 'done') {
+          el.innerHTML = '<h1>' + e(title) + '</h1><div class="word-done"><div class="word">' + e(S.resp[field] || '') + '</div><div class="s2">올렸습니다. 큰 화면을 봐 주세요</div></div>' +
+            '<button type="button" class="linkbtn accent" id="edit">단어 바꾸기</button>';
+          el.querySelector('#edit').onclick = () => { S.sub[field] = 'form'; rerender(); };
+          return;
+        }
+        el.innerHTML = '<h1>' + e(title) + '</h1><p class="sub">' + e(sub) + '</p>' +
+          '<form id="f" class="field"><input class="inp big" id="w" maxlength="10" autocomplete="off" aria-label="' + e(title) + '" value="' + e(S.resp[field] || '') + '">' +
+          '<button class="btn" id="ok" type="submit">올리기</button></form>';
+        const w = el.querySelector('#w'), ok = el.querySelector('#ok');
+        const sync = () => { ok.disabled = !w.value.trim(); };
+        w.oninput = sync; sync();
+        el.querySelector('#f').onsubmit = (ev) => {
+          ev.preventDefault();
+          const v = w.value.trim();
+          if (!v) return;
+          S.resp[field] = v;
+          saveResp({ [field]: v });
+          S.sub[field] = 'done';
+          rerender();
+        };
+      }
+    };
+  }
+
+  /* ---------------- 감정 곡선 ---------------- */
+  function emotionView() {
+    if (!S.sub.emotion) S.sub.emotion = App.done.emotion(S.resp) ? 'done' : 'form';
+    return { key: 'emotion-' + S.sub.emotion, draw: S.sub.emotion === 'done' ? drawEmotionDone : drawEmotionForm };
+  }
+  function drawEmotionDone(el) {
+    el.innerHTML = '<div class="done-card"><div class="check-ico">✓</div><div class="big">완료했습니다</div><div class="s2">큰 화면을 봐 주세요</div></div>' +
+      '<button type="button" class="linkbtn accent" id="edit">다시 고치기</button>';
+    el.querySelector('#edit').onclick = () => { S.sub.emotion = 'form'; rerender(); };
+  }
+  function miniChart(months) {
+    return '<div class="box">' + App.curveSvg(months, { w: 320, h: 74, pad: 6 }) + '</div><div class="axis"><span>1월</span><span>+10 위 · -10 아래</span><span>' + App.MONTH_COUNT + '월</span></div>';
+  }
+  function drawEmotionForm(el) {
+    const em = S.resp.emotion || {};
+    const months = App.months(S.resp);
+    let h = '<h1>2026년, 달마다 나는 어땠나요?</h1><p class="sub">1월부터 ' + App.MONTH_COUNT + '월까지 · 좋았던 달은 오른쪽(+10), 힘들었던 달은 왼쪽(-10)으로</p>' +
+      '<div class="mini" id="mini">' + miniChart(months) + '</div><div class="months">';
+    months.forEach((d, i) => {
+      h += '<div class="mrow' + (d.score == null ? ' unset' : '') + '" data-i="' + i + '">' +
+        '<div class="top"><span class="mname">' + d.m + '월</span>' +
+        '<button type="button" class="step" data-d="-1" aria-label="' + d.m + '월 1점 내리기">−</button>' +
+        '<input type="range" class="slider" min="-10" max="10" step="1" value="' + (d.score == null ? 0 : d.score) + '" aria-label="' + d.m + '월 점수">' +
+        '<button type="button" class="step" data-d="1" aria-label="' + d.m + '월 1점 올리기">+</button>' +
+        '<span class="val"></span></div>' +
+        '<input class="inp reason" maxlength="60" placeholder="이유 (안 써도 됩니다)" aria-label="' + d.m + '월 이유" value="' + e(d.reason || '') + '"></div>';
+    });
+    h += '</div>' +
+      '<div class="field"><label class="lab" for="best">올해 가장 좋았던 순간 한 줄 (안 써도 됩니다)</label><input class="inp" id="best" maxlength="60" placeholder="예: 임원분들이 &quot;이 과정 덕분에 달라졌다&quot;고 말해 주신 날" value="' + e(em.bestMoment || '') + '"></div>' +
+      '<div class="field"><label class="lab" for="lesson">가장 힘들었던 순간에서 배운 것 한 줄 (안 써도 됩니다)</label><input class="inp" id="lesson" maxlength="60" placeholder="예: 혼자 다 하려 하지 않기" value="' + e(em.lowestLesson || '') + '"></div>' +
+      '<button type="button" class="btn" id="done"></button>';
+    el.innerHTML = h;
+
+    const best = el.querySelector('#best'), lesson = el.querySelector('#lesson'), done = el.querySelector('#done'), mini = el.querySelector('#mini');
+    const save = saver(() => saveResp({ emotion: { months: months, bestMoment: best.value.trim(), lowestLesson: lesson.value.trim() } }));
+    const syncDone = () => {
+      const n = months.filter((d) => d.score != null).length;
+      const T = App.MONTH_COUNT;
+      done.disabled = n < T;
+      done.textContent = n < T ? '모두 채우면 클릭해 주세요 (' + n + '/' + T + ')' : '입력 완료';
+    };
+    const syncRow = (row, d) => {
+      row.classList.toggle('unset', d.score == null);
+      row.classList.toggle('pos', d.score != null && d.score > 0);
+      row.classList.toggle('neg', d.score != null && d.score < 0);
+      row.querySelector('.val').textContent = d.score == null ? '아직' : App.fmtScore(d.score) + ' ' + App.emoji(d.score);
+      if (d.score != null) row.querySelector('.slider').value = d.score;
+    };
+    const setScore = (i, v) => {
+      months[i].score = Math.max(-10, Math.min(10, v));
+      syncRow(el.querySelector('.mrow[data-i="' + i + '"]'), months[i]);
+      mini.innerHTML = miniChart(months);
+      syncDone(); save();
+    };
+    el.querySelectorAll('.mrow').forEach((row) => {
+      const i = Number(row.dataset.i);
+      const sl = row.querySelector('.slider');
+      syncRow(row, months[i]);
+      sl.addEventListener('input', () => setScore(i, Number(sl.value)));
+      ['change', 'pointerup', 'keyup'].forEach((ev) => sl.addEventListener(ev, () => { if (months[i].score == null) setScore(i, Number(sl.value)); }));
+      row.querySelectorAll('.step').forEach((b) => (b.onclick = () => setScore(i, (months[i].score == null ? 0 : months[i].score) + Number(b.dataset.d))));
+      row.querySelector('.reason').addEventListener('input', (ev) => { months[i].reason = ev.target.value; save(); });
+    });
+    best.addEventListener('input', save);
+    lesson.addEventListener('input', save);
+    syncDone();
+    done.onclick = () => {
+      save.flush();
+      S.resp.emotion = Object.assign({}, S.resp.emotion, { months: months, completedAt: App.now() });
+      saveResp({ emotion: { completedAt: App.now() } });
+      S.sub.emotion = 'done';
+      rerender();
+    };
+  }
+  function drawEmotionMine(el) {
+    const months = App.months(S.resp);
+    const em = S.resp.emotion || {};
+    el.innerHTML = '<div class="mine-head">지금 내 차례입니다 · 보면서 말씀해 주세요</div>' +
+      '<div class="mini" style="position:static">' + miniChart(months) + '</div>' +
+      '<div class="readlist">' + months.map((d) =>
+        '<div class="r"><span>' + d.m + '월</span><b>' + (d.score == null ? '—' : App.fmtScore(d.score) + ' ' + App.emoji(d.score)) + '</b><span>' + e(d.reason || '') + '</span></div>').join('') + '</div>' +
+      (em.bestMoment ? '<div class="readbox"><div class="k">올해 가장 좋았던 순간</div>' + e(em.bestMoment) + '</div>' : '') +
+      (em.lowestLesson ? '<div class="readbox"><div class="k">힘들었던 순간에서 배운 것</div>' + e(em.lowestLesson) + '</div>' : '');
+  }
+
+  /* ---------------- 나의 사용설명서 ---------------- */
+  function manualView() {
+    if (!S.sub.manual) S.sub.manual = App.done.manual(S.resp) ? 'praise' : 'form';
+    if (S.sub.manual === 'praise') return praiseWriteView(false);
+    return { key: 'manual-form', draw: drawManualForm };
+  }
+  function drawManualForm(el) {
+    const mn = Object.assign({ strengths: ['', '', ''] }, S.resp.manual || {});
+    mn.strengths = [0, 1, 2].map((i) => (mn.strengths || [])[i] || '');
+    let h = '<h1>' + e(App.nim(S.me)) + '의 사용설명서</h1><p class="sub">나를 제품이라고 생각하고 설명서를 써 봅니다 · 필수 4개</p>';
+    App.MANUAL_FIELDS.forEach((f) => {
+      const req = f.req ? '<span class="req">필수</span>' : '';
+      if (f.multi) {
+        h += '<div class="field"><span class="lab"><span>' + e(f.lab) + req + '</span></span>' +
+          [0, 1, 2].map((i) => '<input class="inp" data-k="strengths" data-i="' + i + '" maxlength="' + f.max + '" placeholder="' + e(f.ph[i]) + '" aria-label="잘하는 것 ' + (i + 1) + '" value="' + e(mn.strengths[i]) + '">').join('') + '</div>';
+      } else if (f.area) {
+        h += '<div class="field"><label class="lab" for="f-' + f.k + '"><span>' + e(f.lab) + req + '</span><span class="cnt" data-cnt="' + f.k + '"></span></label>' +
+          '<textarea class="inp" id="f-' + f.k + '" data-k="' + f.k + '" maxlength="' + f.max + '" rows="3" placeholder="' + e(f.ph) + '">' + e(mn[f.k] || '') + '</textarea></div>';
+      } else {
+        h += '<div class="field"><label class="lab" for="f-' + f.k + '"><span>' + e(f.lab) + req + '</span></label>' +
+          '<input class="inp" id="f-' + f.k + '" data-k="' + f.k + '" maxlength="' + f.max + '" placeholder="' + e(f.ph) + '" value="' + e(mn[f.k] || '') + '"' + (f.k === 'mbti' ? ' autocapitalize="characters"' : '') + '></div>';
+      }
+    });
+    h += '<button type="button" class="btn" id="done"></button>';
+    el.innerHTML = h;
+
+    const done = el.querySelector('#done');
+    const collect = () => {
+      const out = { strengths: [0, 1, 2].map((i) => el.querySelector('[data-k="strengths"][data-i="' + i + '"]').value) };
+      App.MANUAL_FIELDS.forEach((f) => { if (!f.multi) out[f.k] = el.querySelector('[data-k="' + f.k + '"]').value; });
+      return out;
+    };
+    const save = saver(() => saveResp({ manual: collect() }));
+    const sync = () => {
+      const data = collect();
+      App.MANUAL_FIELDS.forEach((f) => {
+        const c = el.querySelector('[data-cnt="' + f.k + '"]');
+        if (c) c.textContent = (data[f.k] || '').length + '/' + f.max;
+      });
+      const miss = App.done.manualRequiredMissing(data);
+      done.disabled = miss > 0;
+      done.textContent = miss > 0 ? '필수 4개 중 ' + miss + '개가 비어 있습니다' : '설명서 완료 → 칭찬 쓰러 가기';
+    };
+    el.querySelectorAll('[data-k]').forEach((inp) => inp.addEventListener('input', () => { sync(); save(); }));
+    sync();
+    done.onclick = () => {
+      const data = collect();
+      save.flush();
+      S.resp.manual = Object.assign({}, S.resp.manual, data, { completedAt: App.now() });
+      saveResp({ manual: { completedAt: App.now() } });
+      S.sub.manual = 'praise';
+      rerender();
+    };
+  }
+  function drawManualMine(el) {
+    el.innerHTML = '<div class="mine-head">지금 내 차례입니다 · 보면서 말씀해 주세요</div>' +
+      App.manualCardHtml(S.me, S.resp.manual, { compact: true });
+  }
+
+  /* ---------------- 배정 칭찬 ---------------- */
+  function praiseWriteView(fromInfo) {
+    const st = S.state;
+    const round = st.praiseRound;
+    const assigned = (st.praiseAssignments && st.praiseAssignments[S.me]) || null;
+    const sent = App.done.praiseSent(S.resp, round);
+    return {
+      key: 'praise-w-' + round + '-' + (assigned ? assigned.join(',') : 'none') + '-' + (S.sub.edit || '') + '-' + sent + '-' + fromInfo,
+      draw: (el) => drawPraiseWrite(el, assigned, round, fromInfo)
+    };
+  }
+  function drawPraiseWrite(el, assigned, round, fromInfo) {
+    const back = fromInfo
+      ? '<button type="button" class="linkbtn accent" id="back" style="align-self:flex-start;padding-left:0">← 돌아가기</button>'
+      : '<button type="button" class="linkbtn accent" id="back" style="align-self:flex-start;padding-left:0">← 설명서 고치기</button>';
+    if (!assigned) {
+      el.innerHTML = back + '<div class="info"><div class="info-card"><div class="big">칭찬할 두 분을 정하고 있습니다</div><div class="s2">잠시만 기다려 주세요</div></div></div>';
+      wireBack(el, fromInfo);
+      return;
+    }
+    const LK = 'canmeeting_praise_' + round, DK = 'canmeeting_praise_draft_' + round;
+    const local = App.ls.get(LK, {});
+    const drafts = App.ls.get(DK, {});
+    const serverSent = (S.resp.praise && S.resp.praise.round === round && S.resp.praise.sentTo) || [];
+    const isSent = (to) => !!local[to] || serverSent.includes(to);
+
+    let h = back + '<h1>올해, 이 두 분에게</h1><p class="sub">누가 썼는지는 아무도 알 수 없습니다. 올해 이분에게서 본 좋은 점, 고마웠던 순간, 앞으로 기대하는 점 — 무엇이든 좋습니다</p>';
+    assigned.forEach((to) => {
+      const editing = S.sub.edit === to;
+      if (isSent(to) && !editing) {
+        h += '<div class="praise-slot"><div class="to">' + e(App.nim(to)) + '에게</div>' +
+          '<div class="sent-text">' + (local[to] ? e(local[to].text) : '다른 기기에서 보낸 칭찬입니다') + '</div>' +
+          '<div class="sent-row"><span>보냈습니다</span>' + (local[to] ? '<button type="button" class="linkbtn accent" data-edit="' + to + '">고치기</button>' : '') + '</div></div>';
+      } else {
+        const val = editing && local[to] ? local[to].text : (drafts[to] || '');
+        h += '<div class="praise-slot" data-to="' + to + '"><label class="to" for="t-' + to + '">' + e(App.nim(to)) + '에게</label>' +
+          '<textarea class="inp" id="t-' + to + '" maxlength="200" rows="4" placeholder="예: 올해 ○○ 할 때 먼저 손 내밀어 주셔서 든든했습니다">' + e(val) + '</textarea>' +
+          '<div class="sent-row" style="color:var(--ink3);font-weight:500"><span></span><span class="cnt"></span></div>' +
+          '<button type="button" class="btn small" data-send="' + to + '"></button></div>';
+      }
+    });
+    const allSent = assigned.every(isSent) && !S.sub.edit;
+    if (allSent) h += '<div class="done-card"><div class="check-ico">✓</div><div class="big">칭찬을 모두 보냈습니다</div><div class="s2">큰 화면을 봐 주세요</div></div>';
+    el.innerHTML = h;
+    wireBack(el, fromInfo);
+
+    el.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => { S.sub.edit = b.dataset.edit; rerender(); }));
+    el.querySelectorAll('.praise-slot[data-to]').forEach((slot) => {
+      const to = slot.dataset.to;
+      const ta = slot.querySelector('textarea'), btn = slot.querySelector('[data-send]'), cnt = slot.querySelector('.cnt');
+      const sync = () => {
+        const n = ta.value.trim().length;
+        cnt.textContent = ta.value.length + '/200';
+        btn.disabled = n < 20;
+        btn.textContent = n < 20 ? '20자 이상 써 주세요 (' + n + '/20)' : (local[to] ? '고친 내용 보내기' : '보내기');
+      };
+      ta.addEventListener('input', () => { const d = App.ls.get(DK, {}); d[to] = ta.value; App.ls.set(DK, d); sync(); });
+      sync();
+      btn.onclick = async () => {
+        const text = ta.value.trim();
+        if (text.length < 20) return;
+        btn.disabled = true; btn.textContent = '보내는 중…';
+        try {
+          const cur = App.ls.get(LK, {});
+          if (cur[to]) await App.db.set('praises/' + cur[to].id, { text: text });
+          else cur[to] = { id: await App.db.add('praises', { toId: to, text: text, createdAt: App.now(), round: round }) };
+          cur[to].text = text;
+          App.ls.set(LK, cur);
+          const d = App.ls.get(DK, {}); delete d[to]; App.ls.set(DK, d);
+          const sentTo = Array.from(new Set(serverSent.concat(Object.keys(cur)).filter((id) => assigned.includes(id))));
+          S.resp.praise = { round: round, sentTo: sentTo };
+          await saveResp({ praise: { round: round, sentTo: sentTo } });
+          S.sub.edit = null;
+          rerender();
+        } catch (err) {
+          btn.disabled = false; sync();
+        }
+      };
+    });
+  }
+  function wireBack(el, fromInfo) {
+    el.querySelector('#back').onclick = () => {
+      if (fromInfo) S.sub.praiseOverride = false; else S.sub.manual = 'form';
+      S.sub.edit = null;
+      rerender();
+    };
+  }
+  function drawMyPraise(el, mine) {
+    if (!mine.length) {
+      el.innerHTML = '<div class="info"><div class="info-card"><div class="s1">지금은</div><div class="big">나에게 도착한 칭찬</div><div class="s2">곧 공개됩니다. 큰 화면을 봐 주세요</div></div></div>';
+      return;
+    }
+    el.innerHTML = '<h1>나에게 도착한 칭찬</h1>' + mine.map((p) => '<div class="praise-card fade-in">' + e(p.text) + '</div>').join('');
+  }
+
+  /* ---------------- 클로징 ---------------- */
+  function drawClosing(el, words) {
+    el.innerHTML = '<h1>2027년, 우리 팀의 키워드</h1>' + App.wordWallHtml(words, 'p-wall');
+  }
+
+})();
+</script>
+</body>
+</html>

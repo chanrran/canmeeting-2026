@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>진행자 화면 · 우리 팀 사용설명서</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body class="h">
+<div id="root"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="../config.js"></script>
+<script src="../app.js"></script>
+<script>
+(function () {
+  'use strict';
+  const e = App.esc;
+  const root = document.getElementById('root');
+
+  /* ---------------- 관리자 암호 확인 ---------------- */
+  if (new URLSearchParams(location.search).get('key') !== CONFIG.ADMIN_KEY) {
+    root.innerHTML = '<div class="gate">관리자 암호가 필요합니다</div>';
+    return;
+  }
+
+  const H = { state: null, resp: {}, praises: [], team: null };
+  const PURL = App.participantUrl();
+
+  root.innerHTML =
+    '<header class="h-top"><h1>진행자 화면</h1><span class="mode ' + (App.mode === 'demo' ? 'demo' : '') + '">' +
+      (App.mode === 'demo' ? '데모 모드 · 이 브라우저에서만 저장' : 'Firebase 연결') + '</span><span class="sp"></span>' +
+      '<a href="../screen.html" target="_blank" rel="noopener">큰 화면 열기 ↗</a>' +
+      '<a href="../" target="_blank" rel="noopener">참가자 화면 열기 ↗</a></header>' +
+    '<div class="h-wrap"><aside class="h-side" id="side"></aside><main class="h-main">' +
+      '<section class="panel now" id="ctx"></section>' +
+      '<section class="panel"><h2>제출 현황</h2><div class="status-wrap" id="status"></div></section>' +
+      '<section class="panel" id="assign"></section>' +
+      '<section class="panel" id="prompt"></section>' +
+      '<section class="panel" id="members"></section>' +
+      '<section class="panel" id="data"></section>' +
+    '</main></div>';
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------------- 데이터 구독 ---------------- */
+  App.ready.then(() => {
+    App.watchMembers(() => { renderMembers(); if (H.state) { H.state = App.withDefaults(H.state); renderSide(); renderCtx(); renderAssign(); renderStatus(); } });
+    App.db.watchDoc('session/state', (d) => {
+      if (!d) { App.db.replace('session/state', App.defaultState()); return; }
+      H.state = App.withDefaults(d);
+      renderSide(); renderCtx(); renderAssign(); renderStatus(); fillClosingOnce();
+    });
+    App.db.watchCol('responses', (list) => { H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); });
+    App.db.watchCol('praises', (list) => { H.praises = list; renderStatus(); renderCtx(); renderAssign(); });
+    App.db.watchDoc('teamManual/current', (d) => { H.team = d; renderCtx(); fillResultOnce(); });
+  });
+  const setState = (patch) => App.db.set('session/state', patch);
+
+  /* ---------------- 단계 이동 ---------------- */
+  function go(k) {
+    const st = H.state;
+    const patch = { stage: k };
+    if (k === 'emotion_person' && !st.emotionCurrent) patch.emotionCurrent = st.emotionOrder[0];
+    if (k === 'manual_person' && !st.manualCurrent) { patch.manualCurrent = st.manualOrder[0]; patch.manualRevealed = false; }
+    if (k === 'input_manual' && !st.praiseAssignments) { patch.praiseAssignments = App.makeAssignments(); patch.praiseRound = App.now(); }
+    setState(patch);
+  }
+  function renderSide() {
+    const st = H.state;
+    const i = App.stageIndex(st.stage);
+    $('side').innerHTML = '<h2>진행 단계 (점선 = 입력 시간)</h2>' +
+      App.STAGES.map((s) => '<button type="button" class="stage-btn' + (s.input || s.key === 'lobby' ? ' input' : '') + (s.key === st.stage ? ' on' : '') + '" data-k="' + s.key + '"><span class="t">' + s.time + '</span><span>' + e(s.name) + '</span></button>').join('') +
+      '<div class="nav"><button type="button" class="hb" id="prev"' + (i <= 0 ? ' disabled' : '') + '>◀ 이전 단계</button><button type="button" class="hb solid" id="next"' + (i >= App.STAGES.length - 1 ? ' disabled' : '') + '>다음 단계 ▶</button></div>' +
+      '<p class="note" style="margin-top:10px">휴식 시간에는 단계를 그대로 두면 됩니다.</p>';
+    $('side').querySelectorAll('.stage-btn').forEach((b) => (b.onclick = () => go(b.dataset.k)));
+    $('prev').onclick = () => go(App.STAGES[i - 1].key);
+    $('next').onclick = () => go(App.STAGES[i + 1].key);
+  }
+
+  /* ---------------- 발표 순서 공통 ---------------- */
+  function orderList(orderField, curField, statusFn) {
+    const st = H.state;
+    const order = st[orderField];
+    return '<ol class="order">' + order.map((id, i) =>
+      '<li class="' + (id === st[curField] ? 'cur' : '') + '"><span class="no">' + (i + 1) + '</span><span>' + e(App.label(id)) + '</span><span class="st">' + (statusFn ? statusFn(id) : '') + '</span>' +
+      '<button type="button" data-mv="' + id + '" data-d="-1" aria-label="' + e(App.label(id)) + ' 위로"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+      '<button type="button" data-mv="' + id + '" data-d="1" aria-label="' + e(App.label(id)) + ' 아래로"' + (i === order.length - 1 ? ' disabled' : '') + '>↓</button></li>').join('') + '</ol>';
+  }
+  function wireOrder(el, orderField) {
+    el.querySelectorAll('[data-mv]').forEach((b) => (b.onclick = () => {
+      const order = H.state[orderField].slice();
+      const i = order.indexOf(b.dataset.mv), j = i + Number(b.dataset.d);
+      if (j < 0 || j >= order.length) return;
+      [order[i], order[j]] = [order[j], order[i]];
+      setState({ [orderField]: order });
+    }));
+  }
+  function step(orderField, curField, d, extra) {
+    const st = H.state;
+    const order = st[orderField];
+    const i = order.indexOf(st[curField]);
+    const j = i < 0 ? 0 : i + d;
+    if (j < 0 || j >= order.length) return;
+    setState(Object.assign({ [curField]: order[j] }, extra || {}));
+  }
+  const nextName = (orderField, curField) => {
+    const o = H.state[orderField]; const i = o.indexOf(H.state[curField]);
+    return i >= 0 && i < o.length - 1 ? App.label(o[i + 1]) : '';
+  };
+
+  /* ---------------- 칭찬 공개 ---------------- */
+  const praisesFor = (id) => H.praises.filter((p) => p.toId === id && p.round === H.state.praiseRound).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  function praiseStep() {
+    const st = H.state, order = st.praiseOrder;
+    if (!st.praiseTarget) return { label: '시작: ' + App.nim(order[0]) + '에게 도착한 칭찬 보여 주기', run: () => setState({ praiseTarget: order[0] }) };
+    const shown = st.revealedPraises.filter((p) => p.toId === st.praiseTarget).map((p) => p.id);
+    const recv = praisesFor(st.praiseTarget);
+    const nx = recv.find((p) => !shown.includes(p.id));
+    if (nx) return {
+      label: App.nim(st.praiseTarget) + '의 ' + (shown.length + 1) + '번째 칭찬 공개',
+      run: () => setState({ revealedPraises: st.revealedPraises.concat([{ id: nx.id, toId: nx.toId, text: nx.text }]) })
+    };
+    const i = order.indexOf(st.praiseTarget);
+    if (i < order.length - 1) return { label: '다음 사람: ' + App.label(order[i + 1]) + ' ▶', run: () => setState({ praiseTarget: order[i + 1] }) };
+    return { label: '모든 칭찬을 공개했습니다', run: null };
+  }
+
+  /* ---------------- 지금 단계 패널 ---------------- */
+  function renderCtx() {
+    if (!H.state) return;
+    const st = H.state;
+    const el = $('ctx');
+    let h = '<h2>지금 단계 · ' + e(App.stageName(st.stage)) + '</h2>';
+    const R = H.resp;
+    const cnt = (fn) => App.members.filter((m) => fn(R[m.id])).length;
+    const N = App.members.length;
+
+    switch (st.stage) {
+      case 'title':
+        h += '<p class="desc">큰 화면에 제목이 나옵니다. 담당님 인사말이 끝나면 "다음 단계"를 눌러 접속 안내로 넘어가세요.</p>'; break;
+      case 'lobby':
+        h += '<p class="desc">참가자 주소: <b>' + e(PURL) + '</b><br>접속 ' + cnt(App.done.joined) + '/' + N + ' · 올해 한 단어 ' + cnt(App.done.yearWord) + '/' + N + '</p>'; break;
+      case 'input_emotion':
+        h += '<p class="desc">감정 곡선 제출 ' + cnt(App.done.emotion) + '/' + N + '. 입력이 끝나면 "다음 단계"로 발표를 시작하세요.</p>'; break;
+      case 'emotion_person':
+        h += '<p class="desc">발표자 한 명의 곡선이 큰 화면에 나옵니다. 1인 3분.</p>' +
+                    '<div class="tools"><button type="button" class="hb" id="p1">◀ 이전 발표자</button><button type="button" class="hb solid big" id="n1">다음 발표자' + (nextName('emotionOrder', 'emotionCurrent') ? ': ' + e(nextName('emotionOrder', 'emotionCurrent')) : '') + ' ▶</button><button type="button" class="hb" id="sh1">순서 무작위 섞기</button></div>' +
+          orderList('emotionOrder', 'emotionCurrent', (id) => (App.done.emotion(R[id]) ? '' : App.done.emotionCount(R[id]) + '/' + App.MONTH_COUNT));
+        break;
+      case 'emotion_team':
+        h += '<p class="desc">' + N + '명의 곡선이 겹쳐 보입니다. 큰 화면 오른쪽 카드 세 개(가장 좋았던 달·힘들었던 달·엇갈린 달)를 누르면 그 달의 이유가 펼쳐집니다.</p>'; break;
+      case 'input_manual': {
+        const sent = App.members.reduce((a, m) => a + App.done.praiseSent(R[m.id], st.praiseRound), 0);
+        h += '<p class="desc">설명서 제출 ' + cnt(App.done.manual) + '/' + N + ' · 칭찬 ' + sent + '/' + N * 2 + '</p>' +
+          '<p class="note">칭찬할 두 분은 이 단계에 들어올 때 자동으로 배정되었습니다. 발표로 넘어가기 전에 "누구의 설명서일까" 순서를 무작위로 섞어 두세요.</p>'; break;
+      }
+      case 'manual_person': {
+        const nm = nextName('manualOrder', 'manualCurrent');
+        h += '<p class="desc">큰 화면에 이름을 가린 설명서가 나옵니다 → 다 같이 맞혀 본 뒤 "이름 공개" → 주인공이 설명합니다.</p>' +
+          '<div class="tools">' +
+          (st.manualRevealed
+            ? '<button type="button" class="hb solid big" id="n2">다음 사람' + (nm ? ': ' + e(nm) : '') + ' (이름 가림) ▶</button>'
+            : '<button type="button" class="hb solid big" id="rv">이름 공개</button><button type="button" class="hb" id="n2">건너뛰기 ▶</button>') +
+          '<button type="button" class="hb" id="p2">◀ 이전 사람</button><button type="button" class="hb" id="sh2">순서 무작위 섞기</button></div>' +
+          orderList('manualOrder', 'manualCurrent', (id) => (App.done.manual(R[id]) ? '' : '미제출'));
+        break;
+      }
+      case 'praise': {
+        const ps = praiseStep();
+        const shownCnt = st.praiseTarget ? st.revealedPraises.filter((p) => p.toId === st.praiseTarget).length : 0;
+        h += '<p class="desc">칭찬을 공개하는 동안 아래 "우리 팀 사용설명서 프롬프트"를 Claude·GPT에 돌려 두세요.' +
+          (st.praiseTarget ? '<br>지금: <b>' + e(App.label(st.praiseTarget)) + '</b> · ' + shownCnt + '/' + praisesFor(st.praiseTarget).length + '장 공개' : '') + '</p>' +
+          '<div class="tools"><button type="button" class="hb solid big" id="pn"' + (ps.run ? '' : ' disabled') + '>' + e(ps.label) + '</button>' +
+          '<button type="button" class="hb" id="pp">◀ 이전 사람</button><button type="button" class="hb" id="sh3">순서 무작위 섞기</button></div>' +
+          orderList('praiseOrder', 'praiseTarget', (id) => praisesFor(id).length + '장');
+        break;
+      }
+      case 'team_manual': {
+        if (!H.team || !H.team.markdown) { h += '<div class="warnline">아직 결과를 반영하지 않았습니다. 아래 "우리 팀 사용설명서 프롬프트"에서 결과를 붙여넣고 "큰 화면에 반영"을 눌러 주세요.</div>'; break; }
+        const n = App.splitSlides(H.team.markdown).length;
+        const cur = Math.min(st.teamSlide || 0, n - 1);
+        h += '<p class="desc">슬라이드 <b>' + (cur + 1) + ' / ' + n + '</b> · 큰 화면 창에서 키보드 ← → 로도 넘길 수 있습니다.</p>' +
+          '<div class="tools"><button type="button" class="hb" id="sp"' + (cur <= 0 ? ' disabled' : '') + '>◀ 이전 슬라이드</button><button type="button" class="hb solid big" id="sn"' + (cur >= n - 1 ? ' disabled' : '') + '>다음 슬라이드 ▶</button></div>';
+        break;
+      }
+      case 'input_keyword':
+        h += '<p class="desc">내년 키워드 ' + cnt(App.done.nextYearWord) + '/' + N + '</p>'; break;
+      case 'closing':
+        h += '<p class="desc">모두의 내년 키워드가 큰 화면에 단어 벽으로 나옵니다. 함께 본 뒤 "다음 단계"로 담당님 마무리 인사로 넘어가세요.</p>'; break;
+      case 'farewell':
+        h += '<p class="desc">큰 화면에 "Wrap-up"이 나옵니다. 담당님 마무리 인사로 행사를 마칩니다.</p>'; break;
+    }
+    el.innerHTML = h;
+
+    const on = (id, fn) => { const b = el.querySelector('#' + id); if (b) b.onclick = fn; };
+    on('n1', () => step('emotionOrder', 'emotionCurrent', 1));
+    on('p1', () => step('emotionOrder', 'emotionCurrent', -1));
+    on('sh1', () => { const o = App.shuffle(st.emotionOrder); setState({ emotionOrder: o, emotionCurrent: o[0] }); });
+    on('rv', () => setState({ manualRevealed: true }));
+    on('n2', () => step('manualOrder', 'manualCurrent', 1, { manualRevealed: false }));
+    on('p2', () => step('manualOrder', 'manualCurrent', -1, { manualRevealed: false }));
+    on('sh2', () => { const o = App.shuffle(st.manualOrder); setState({ manualOrder: o, manualCurrent: o[0], manualRevealed: false }); });
+    on('pn', () => { const ps = praiseStep(); if (ps.run) ps.run(); });
+    on('pp', () => step('praiseOrder', 'praiseTarget', -1));
+    on('sh3', () => setState({ praiseOrder: App.shuffle(st.praiseOrder), praiseTarget: null }));
+    on('sp', () => setState({ teamSlide: Math.max(0, (st.teamSlide || 0) - 1) }));
+    on('sn', () => setState({ teamSlide: (st.teamSlide || 0) + 1 }));
+    const of = { emotion_person: 'emotionOrder', manual_person: 'manualOrder', praise: 'praiseOrder' }[st.stage];
+    if (of) wireOrder(el, of);
+  }
+
+  /* ---------------- 제출 현황 ---------------- */
+  function renderStatus() {
+    if (!H.state) return;
+    const R = H.resp, round = H.state.praiseRound;
+    const cell = (ok, part) => (ok ? '<td class="y">✓</td>' : part ? '<td class="part">' + part + '</td>' : '<td class="n">-</td>');
+    const tot = { j: 0, y: 0, em: 0, mn: 0, pr: 0, nx: 0 };
+    let rows = '';
+    App.members.forEach((m) => {
+      const r = R[m.id];
+      const emN = App.done.emotionCount(r);
+      const mnDone = App.done.manual(r);
+      const mnPart = !mnDone && r && r.manual ? '작성 중' : '';
+      const pr = App.done.praiseSent(r, round);
+      const need = (H.state.praiseAssignments && H.state.praiseAssignments[m.id] || []).length || 2;
+      if (App.done.joined(r)) tot.j++;
+      if (App.done.yearWord(r)) tot.y++;
+      if (App.done.emotion(r)) tot.em++;
+      if (mnDone) tot.mn++;
+      tot.pr += pr;
+      if (App.done.nextYearWord(r)) tot.nx++;
+      rows += '<tr><td>' + e(m.label) + '</td>' + cell(App.done.joined(r)) + cell(App.done.yearWord(r)) +
+        cell(App.done.emotion(r), emN ? emN + '/' + App.MONTH_COUNT : '') + cell(mnDone, mnPart) + cell(pr >= need, pr ? pr + '/' + need : '') + cell(App.done.nextYearWord(r)) + '</tr>';
+    });
+    const N = App.members.length;
+    $('status').innerHTML = '<table class="status"><thead><tr><th>이름</th><th>접속</th><th>올해 한 단어</th><th>감정 곡선</th><th>사용설명서</th><th>칭찬</th><th>내년 키워드</th></tr></thead><tbody>' + rows +
+      '</tbody><tfoot><tr><td>합계</td><td>' + tot.j + '/' + N + '</td><td>' + tot.y + '/' + N + '</td><td>' + tot.em + '/' + N + '</td><td>' + tot.mn + '/' + N + '</td><td>' + tot.pr + '/' + N * 2 + '</td><td>' + tot.nx + '/' + N + '</td></tr></tfoot></table>';
+  }
+
+  /* ---------------- 칭찬 배정 ---------------- */
+  let reassignArmed = false;
+  function renderAssign() {
+    if (!H.state) return;
+    const st = H.state;
+    const has = !!st.praiseAssignments;
+    const written = H.praises.filter((p) => p.round === st.praiseRound).length;
+    $('assign').innerHTML = '<h2>칭찬 배정</h2>' +
+      '<p class="desc">' + (has ? '배정 완료 · 각자 두 분에게 씁니다 · 지금까지 ' + written + '건 작성' : '아직 배정하지 않았습니다. "사용설명서 + 칭찬 입력" 단계로 넘어가면 자동으로 배정됩니다.') + '</p>' +
+      (has && (Object.keys(st.praiseAssignments).length !== App.members.length || App.memberIds.some((id) => !st.praiseAssignments[id]))
+        ? '<div class="warnline">참가자 명단이 배정 뒤에 바뀌었습니다. "다시 배정"을 눌러 주세요.</div>' : '') +
+      '<p class="note">누가 누구에게 쓰는지는 이 화면에도 표시하지 않습니다.</p>' +
+      '<div class="tools"><button type="button" class="hb ' + (reassignArmed ? 'danger solid' : '') + '" id="ra">' +
+      (has ? (reassignArmed ? '정말 다시 배정할까요? 작성된 칭찬 ' + written + '건이 지워집니다 — 한 번 더 누르세요' : '다시 배정') : '지금 배정') + '</button></div>';
+    $('ra').onclick = async () => {
+      if (has && written > 0 && !reassignArmed) { reassignArmed = true; renderAssign(); setTimeout(() => { reassignArmed = false; renderAssign(); }, 6000); return; }
+      reassignArmed = false;
+      if (has) await App.db.delCol('praises');
+      await setState({ praiseAssignments: App.makeAssignments(), praiseRound: App.now(), revealedPraises: [], praiseTarget: null });
+    };
+  }
+
+  /* ---------------- 우리 팀 사용설명서 프롬프트 ---------------- */
+  $('prompt').innerHTML = '<h2>우리 팀 사용설명서 프롬프트</h2>' +
+    '<p class="desc">① 프롬프트 만들기 → ② 복사 → Claude 또는 GPT 채팅에 붙여넣고 실행 → ③ 결과를 아래 칸에 붙여넣기 → ④ 큰 화면에 반영</p>' +
+    '<div class="tools"><button type="button" class="hb solid" id="mk">① 프롬프트 만들기</button><button type="button" class="hb" id="cp" disabled>② 복사</button><span class="okline" id="cpok"></span></div>' +
+    '<div id="miss"></div><textarea class="code" id="pt" readonly placeholder="① 프롬프트 만들기를 누르면 여기에 완성 프롬프트가 나타납니다"></textarea><p class="note" id="plen"></p>' +
+    '<h2 style="margin-top:14px">③ 결과 붙여넣기</h2><textarea class="code" id="rs" placeholder="Claude·GPT가 만든 &quot;# 우리 팀 사용설명서 (2026)&quot; 전체를 여기에 붙여넣어 주세요"></textarea>' +
+    '<div class="tools" style="margin-top:8px"><button type="button" class="hb solid" id="ap">④ 큰 화면에 반영</button><span class="okline" id="apok"></span></div>';
+  $('mk').onclick = () => {
+    const b = App.buildPrompt(H.resp);
+    $('pt').value = b.text;
+    $('plen').textContent = b.text.length.toLocaleString() + '자 · ' + b.included + '명 포함';
+    $('miss').innerHTML = b.missing.length ? '<div class="warnline">미제출 ' + b.missing.length + '명(' + e(b.missing.join(', ')) + ') — 자료에서 제외됨</div>' : '';
+    $('cp').disabled = false;
+    $('cpok').textContent = '';
+  };
+  $('cp').onclick = async () => {
+    const t = $('pt');
+    try { await navigator.clipboard.writeText(t.value); } catch (err) { t.select(); document.execCommand('copy'); }
+    $('cpok').textContent = '복사했습니다. Claude·GPT 채팅에 붙여넣으세요';
+  };
+  $('ap').onclick = async () => {
+    const md = $('rs').value.trim();
+    if (!md) { $('apok').textContent = ''; App.showError('결과 칸이 비어 있습니다. Claude·GPT가 만든 결과를 먼저 붙여넣어 주세요.'); return; }
+    await App.db.replace('teamManual/current', { markdown: md, pastedAt: App.now() });
+    await setState({ teamSlide: 0 });
+    const n = App.splitSlides(md).length;
+    $('apok').textContent = '반영했습니다 · 슬라이드 ' + n + '장' + (n <= 1 ? ' (## 제목 줄이 없어 한 장으로 나옵니다)' : '');
+  };
+  let resultFilled = false;
+  function fillResultOnce() { if (!resultFilled && H.team && H.team.markdown && !$('rs').value) { $('rs').value = H.team.markdown; resultFilled = true; } }
+
+  function fillClosingOnce() {}
+
+  /* ---------------- 참가자 명단 ---------------- */
+  let mDraft = null, mDirty = false;
+  function renderMembers() {
+    if (!mDirty) mDraft = App.members.map((m) => ({ id: m.id, name: m.name, role: m.role }));
+    const el = $('members');
+    el.innerHTML = '<h2>참가자 명단 (' + mDraft.length + '명)</h2>' +
+      '<p class="desc">이름·호칭을 고치거나, 사람을 추가·삭제할 수 있습니다. 위아래 버튼으로 순서를 바꾸면 화면에 나오는 순서도 바뀝니다. <b>저장</b>을 눌러야 모든 화면에 반영됩니다.</p>' +
+      '<datalist id="roles"><option value="담당"><option value="팀장"><option value="RF"><option value="RA"></datalist>' +
+      '<ol class="order" style="max-width:640px">' + mDraft.map((m, i) =>
+        '<li style="grid-template-columns:28px 1fr 110px 32px 32px 52px"><span class="no">' + (i + 1) + '</span>' +
+        '<input class="inp" style="padding:6px 10px;font-size:14px" data-i="' + i + '" data-f="name" value="' + e(m.name) + '" placeholder="이름" aria-label="' + (i + 1) + '번 이름">' +
+        '<input class="inp" style="padding:6px 10px;font-size:14px" list="roles" data-i="' + i + '" data-f="role" value="' + e(m.role) + '" placeholder="호칭" aria-label="' + (i + 1) + '번 호칭">' +
+        '<button type="button" data-mm="' + i + '" data-d="-1" aria-label="위로"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" data-mm="' + i + '" data-d="1" aria-label="아래로"' + (i === mDraft.length - 1 ? ' disabled' : '') + '>↓</button>' +
+        '<button type="button" data-del="' + i + '" style="width:52px;color:#D4534E">삭제</button></li>').join('') + '</ol>' +
+      '<div class="tools"><button type="button" class="hb" id="madd">+ 한 명 추가</button>' +
+      '<button type="button" class="hb solid" id="msave"' + (mDirty ? '' : ' disabled') + '>저장</button>' +
+      (mDirty ? '<button type="button" class="hb" id="mcancel">고친 내용 취소</button>' : '') +
+      '<button type="button" class="hb" id="mreset">config.js 명단으로 되돌리기</button><span class="okline" id="mok"></span></div>' +
+      '<p class="note">이미 입력을 시작한 분을 삭제하면 그분의 입력은 화면에서 빠집니다. 같은 분을 다시 추가하면 새 사람으로 처리되니, 이름을 잘못 적었을 때는 삭제하지 말고 이름 칸만 고쳐 주세요.</p>';
+    const dirty = () => { if (!mDirty) { mDirty = true; const b = $('msave'); if (b) b.disabled = false; } };
+    el.querySelectorAll('input[data-i]').forEach((inp) => inp.addEventListener('input', () => { mDraft[Number(inp.dataset.i)][inp.dataset.f] = inp.value; dirty(); }));
+    el.querySelectorAll('[data-mm]').forEach((b) => (b.onclick = () => {
+      const i = Number(b.dataset.mm), j = i + Number(b.dataset.d);
+      [mDraft[i], mDraft[j]] = [mDraft[j], mDraft[i]]; mDirty = true; renderMembers();
+    }));
+    el.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => { mDraft.splice(Number(b.dataset.del), 1); mDirty = true; renderMembers(); }));
+    $('madd').onclick = () => { mDraft.push({ id: 'm_' + Date.now().toString(36), name: '', role: 'RF' }); mDirty = true; renderMembers(); const ins = el.querySelectorAll('input[data-f="name"]'); ins[ins.length - 1].focus(); };
+    if ($('mcancel')) $('mcancel').onclick = () => { mDirty = false; renderMembers(); };
+    $('msave').onclick = async () => {
+      const list = mDraft.map((m) => ({ id: m.id, name: (m.name || '').trim(), role: (m.role || '').trim() }));
+      if (list.some((m) => !m.name)) { App.showError('이름이 비어 있는 줄이 있습니다. 이름을 채우거나 그 줄을 삭제해 주세요.'); return; }
+      await App.db.replace('settings/members', { list: list, updatedAt: App.now() });
+      mDirty = false;
+      renderMembers();
+      $('mok').textContent = '저장했습니다 · 모든 화면에 반영됩니다';
+    };
+    $('mreset').onclick = async () => {
+      await App.db.del('settings/members');
+      mDirty = false;
+      renderMembers();
+      $('mok').textContent = 'config.js 명단으로 되돌렸습니다';
+    };
+  }
+  renderMembers();
+
+  /* ---------------- 데이터: CSV·테스트·초기화 ---------------- */
+  $('data').innerHTML = '<h2>데이터</h2>' +
+    '<div class="tools"><button type="button" class="hb" id="csv1">응답 전체 CSV 내보내기</button><button type="button" class="hb" id="csv2">칭찬 전체 CSV 내보내기</button></div>' +
+    '<p class="note">칭찬 CSV에는 받는 사람과 내용만 들어갑니다(보낸 사람 없음).</p>' +
+    '<div class="tools" style="margin-top:10px"><button type="button" class="hb" id="test">테스트 데이터 생성 (리허설용)</button><button type="button" class="hb danger" id="reset">전체 초기화</button></div>' +
+    '<p class="note">테스트 데이터는 모든 참가자의 입력과 우리 팀 사용설명서 결과를 가짜 내용으로 채웁니다. 행사 전날 반드시 "전체 초기화"로 지워 주세요.</p>';
+
+  const csv = (rows) => '﻿' + rows.map((r) => r.map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  function download(name, text) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+    a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  $('csv1').onclick = () => {
+    const head = ['이름', '올해 한 단어', '내년 키워드'].concat(Array.from({ length: App.MONTH_COUNT }, (_, i) => (i + 1) + '월 점수'), Array.from({ length: App.MONTH_COUNT }, (_, i) => (i + 1) + '월 이유'),
+      ['가장 좋았던 순간', '힘들었던 순간에서 배운 것', '제품명(별명)', 'MBTI', '잘하는 것 1', '잘하는 것 2', '잘하는 것 3', '작동 방식', '제품 특성', '주의사항', '고장 신호', '충전 방법']);
+    const rows = [head].concat(App.members.map((m) => {
+      const r = H.resp[m.id] || {}, ms = App.months(r), em = r.emotion || {}, mn = r.manual || {};
+      return [m.label, r.yearWord, r.nextYearWord].concat(ms.map((d) => d.score), ms.map((d) => d.reason),
+        [em.bestMoment, em.lowestLesson, mn.nickname, mn.mbti, (mn.strengths || [])[0], (mn.strengths || [])[1], (mn.strengths || [])[2], mn.workStyle, mn.personality, mn.respect, mn.tiredSignal, mn.recharge]);
+    }));
+    download('캔미팅_응답_전체.csv', csv(rows));
+  };
+  $('csv2').onclick = () => {
+    const list = H.praises.filter((p) => p.round === H.state.praiseRound)
+      .sort((a, b) => App.memberIds.indexOf(a.toId) - App.memberIds.indexOf(b.toId));
+    download('캔미팅_칭찬_전체.csv', csv([['받는 사람', '내용']].concat(list.map((p) => [App.label(p.toId), p.text]))));
+  };
+
+  function twoStep(btn, armedText, run) {
+    let armed = false, t = null;
+    const orig = btn.textContent;
+    btn.onclick = async () => {
+      if (!armed) {
+        armed = true; btn.textContent = armedText; btn.classList.add('danger', 'solid');
+        t = setTimeout(() => { armed = false; btn.textContent = orig; btn.classList.remove('solid'); if (btn.id !== 'reset') btn.classList.remove('danger'); }, 6000);
+        return;
+      }
+      clearTimeout(t); armed = false;
+      btn.disabled = true; btn.textContent = '처리 중…';
+      try { await run(); btn.textContent = '완료했습니다'; }
+      catch (err) { btn.textContent = orig; }
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; btn.classList.remove('solid'); if (btn.id !== 'reset') btn.classList.remove('danger'); }, 1500);
+    };
+  }
+  twoStep($('reset'), '정말 모두 지울까요? 한 번 더 누르면 삭제됩니다', async () => {
+    await App.db.delCol('responses');
+    await App.db.delCol('praises');
+    await App.db.del('teamManual/current');
+    await App.db.replace('session/state', App.defaultState());
+    resultFilled = false; $('rs').value = ''; $('pt').value = '';
+  });
+  twoStep($('test'), '지금 입력된 내용을 덮어씁니다. 한 번 더 누르세요', makeTestData);
+
+  async function makeTestData() {
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const W1 = ['성장', '버티기', '전환', '롤러코스터', '새로움', '동료', '성장', '배움', '숨가쁨', '전환', '도전', '감사', '성장', '실험'];
+    const W2 = ['여유', '연결', '확장', '여유', '몰입', '건강', '함께', '깊이', '여유', '실행', '균형', '재미', '연결', '단단함'];
+    const RS = ['신규 과정 3개 동시 오픈', '팀 재편으로 역할이 바뀜', '임원 과정 첫 기수 성공', '연휴 뒤 몰아친 일정', '좋은 동료를 새로 만남', '기획안이 한 번에 통과', '야근이 이어짐', '휴가로 재충전', '현장 반응이 뜨거웠음', '예산 조정으로 일정 변경'];
+    const NK = ['일단 해보는 실행러', '조용한 정리왕', '분위기 메이커', '꼼꼼한 마무리 담당', '아이디어 발전소', '든든한 버팀목', '빠른 손', '질문 많은 탐험가'];
+    const MB = ['ENFP', 'ISTJ', 'INFJ', 'ENTJ', 'ISFJ', 'ENTP', 'INTP', 'ESFJ', ''];
+    const ST = ['처음 보는 일 구조 잡기', '분위기 읽고 띄우기', '문서 깔끔하게 정리하기', '마감 지키기', '사람 연결하기', '데이터로 설명하기', '디자인 감각', '끈기'];
+    const WS = ['아침에 집중이 잘 됩니다. 말로 먼저 정리한 뒤 문서로 옮깁니다.', '혼자 충분히 생각한 뒤 이야기하는 편입니다.', '빠르게 초안을 만들고 여러 번 고칩니다.', '마감 3일 전에 초안이 나와야 마음이 편합니다.'];
+    const PS = ['겉은 밝고 속은 걱정이 많습니다. "늘 여유 있어 보인다"는 오해를 받습니다.', '말수가 적어 차가워 보이지만 관심은 많습니다.', '급해 보이지만 사실 계획이 있습니다.'];
+    const RP = ['피드백은 사람들 앞이 아니라 따로 주세요.', '회의 중 휴대폰 보면서 답하지 않기.', '급한 일은 메신저보다 전화로 알려 주세요.', '결정 이유를 함께 알려 주세요.'];
+    const TS = ['말수가 줄고 답장이 한 단어가 됩니다.', '점심을 거릅니다.', '이어폰을 오래 끼고 있습니다.'];
+    const RC = ['점심에 혼자 산책 30분.', '"잘하고 있다"는 한마디.', '맛있는 커피 한 잔.', '주말에 푹 자기.'];
+    const PR = ['올해 가장 바쁠 때 먼저 손 내밀어 주셔서 정말 든든했습니다. 고맙습니다.', '회의 때마다 차분하게 정리해 주셔서 방향을 잃지 않을 수 있었습니다.', '늘 웃으며 인사해 주셔서 사무실 분위기가 밝아졌습니다. 내년에도 부탁드려요.', '어려운 요청에도 "해 보죠"라고 말해 주셔서 큰 힘이 됐습니다.'];
+
+    let st = H.state;
+    let assign = st.praiseAssignments, round = st.praiseRound;
+    if (!assign) { assign = App.makeAssignments(); round = App.now(); await setState({ praiseAssignments: assign, praiseRound: round }); }
+    await App.db.delCol('praises');
+    for (const [i, m] of App.members.entries()) {
+      let s = Math.round(Math.random() * 6 - 2);
+      const months = App.emptyMonths().map((d) => { s = Math.max(-10, Math.min(10, s + Math.round(Math.random() * 8 - 4))); return { m: d.m, score: s, reason: Math.random() < 0.55 ? pick(RS) : '' }; });
+      await App.db.replace('responses/' + m.id, {
+        joinedAt: App.now(), yearWord: W1[i % W1.length], nextYearWord: W2[i % W2.length],
+        emotion: { months, bestMoment: '현장에서 "덕분에 달라졌다"는 말을 들은 날', lowestLesson: '혼자 다 하려 하지 않기', completedAt: App.now() },
+        manual: { nickname: pick(NK), mbti: pick(MB), strengths: App.shuffle(ST).slice(0, 3).map((s, k) => (k < 2 || Math.random() < 0.5 ? s : '')), workStyle: pick(WS), personality: pick(PS), respect: pick(RP), tiredSignal: pick(TS), recharge: pick(RC), completedAt: App.now() },
+        praise: { round, sentTo: assign[m.id].slice() },
+        updatedAt: App.now()
+      });
+    }
+    for (const m of App.members) {
+      for (const to of assign[m.id]) await App.db.add('praises', { toId: to, text: pick(PR), createdAt: App.now(), round });
+    }
+    const SAMPLE_TEAM = "# 우리 팀 사용설명서 (2026) — 테스트용 예시\n\n## 1. 제품 개요 — 우리 팀을 한 문장으로\n우리 팀은 \"일단 해보는 실행러\"와 \"조용한 정리왕\"이 한 책상에 앉은 팀입니다. 빠르게 시작하고 꼼꼼하게 마무리하는 두 가지 힘이 함께 돌아갑니다.\n\n## 2. 주요 기능 — 우리 팀의 강점 3가지\n- **빠른 착수**: \"처음 보는 일 구조 잡기\"(박귀애 RF), \"빠르게 초안을 만들고 여러 번 고칩니다\"(김주희 RF). 새 과정을 급히 열어야 할 때 빛납니다.\n- **분위기 메이커**: \"분위기 읽고 띄우기\"가 여러 명에게서 나왔습니다. 긴 워크숍 현장에서 빛납니다.\n- **마감 감각**: \"마감 3일 전에 초안이 나와야 마음이 편합니다\"라는 말이 반복됩니다.\n\n## 3. 알려진 이슈 — 보완이 필요한 점 3가지\n- **혼자 떠안기**: 지쳤을 때 \"말수가 줄고 답장이 한 단어가 됩니다\". 팀 차원에서 주간 점검 한 줄을 권합니다.\n- **피드백 방식 차이**: 공개 피드백을 불편해하는 분이 많습니다.\n- **급한 요청 채널**: 메신저와 전화 기대가 다릅니다.\n\n## 4. 조합의 힘 — 서로 다른 특성이 만나면 생기는 기회\n1. 말로 먼저 정리하는 분들과 문서로 먼저 정리하는 분들이 짝을 이루면 기획 속도와 완성도를 함께 잡을 수 있습니다.\n2. 빠른 초안형과 꼼꼼한 마무리형을 한 과제에 묶으면 재작업이 줄어듭니다.\n3. 분위기 메이커와 조용한 관찰자가 함께 진행하면 현장 반응을 놓치지 않습니다.\n\n## 5. 취급 주의 — 서로 지켜야 할 것\n- 피드백은 따로, 칭찬은 함께\n- 회의 중에는 화면 대신 얼굴 보기\n- 급한 일은 전화로\n- 결정의 이유를 함께 나누기\n\n## 6. 정비 안내 — 2026년 감정 곡선에서 읽히는 것\n팀 전체가 4월에 함께 힘들었고 7월에 함께 좋았습니다. 신규 과정이 몰린 시기에 부담이 한꺼번에 왔고, 성과가 보인 순간 회복했습니다. 바쁜 시기를 미리 나눠 지는 것이 가장 큰 교훈입니다.\n\n## 7. 더 잘 어우러지기 위한 제언 5가지\n1. 월요일 아침 10분, 이번 주 \"고장 신호\"를 한 줄씩 나눕니다.\n2. 새 과정은 초안형 한 명과 마무리형 한 명을 짝으로 배정합니다.\n3. 피드백은 1:1로, 칭찬은 채널에 공개로 합니다.\n4. 급한 요청은 전화, 나머지는 메신저로 약속합니다.\n5. 분기마다 \"나의 사용설명서\"를 한 줄씩 업데이트합니다.";
+    await App.db.replace('teamManual/current', { markdown: SAMPLE_TEAM, pastedAt: App.now() });
+    $('rs').value = SAMPLE_TEAM; resultFilled = true;
+    await setState({ revealedPraises: [], praiseTarget: null, teamSlide: 0 });
+  }
+})();
+</script>
+</body>
+</html>

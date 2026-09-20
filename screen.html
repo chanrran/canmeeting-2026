@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>큰 화면 · 우리 팀 사용설명서</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="s">
+<div class="s-frame" id="frame">
+  <div class="s-stage" id="stage"></div>
+  <div class="s-corner" id="corner"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="qrcode.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  'use strict';
+  const e = App.esc;
+  const frame = document.getElementById('frame');
+  const $corner = document.getElementById('corner');
+  const V = { state: null, resp: {}, praises: [], team: null, selMonth: null, lastHtml: '', lastCorner: '' };
+
+  /* ---------------- 1920×1080 화면을 창 크기에 맞춤 ---------------- */
+  function fit() {
+    const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+    frame.style.transform = 'translate(' + (innerWidth - 1920 * s) / 2 + 'px,' + (innerHeight - 1080 * s) / 2 + 'px) scale(' + s + ')';
+  }
+  addEventListener('resize', fit); fit();
+
+  /* ---------------- 참가자 주소 QR ---------------- */
+  const PURL = App.participantUrl();
+  let QR = '';
+  try {
+    const q = qrcode(0, 'M');
+    q.addData(PURL);
+    q.make();
+    QR = q.createDataURL(12, 0);
+  } catch (err) { QR = ''; }
+  const qrImg = (alt) => (QR ? '<img src="' + QR + '" alt="' + e(alt) + '">' : '<div style="color:#0F1626;font-size:14px;word-break:break-all">' + e(PURL) + '</div>');
+
+  /* ---------------- 데이터 ---------------- */
+  App.demoBadge();
+  App.ready.then(() => {
+    App.watchMembers(() => { N = App.members.length; V.lastHtml = ''; render(); });
+    App.db.watchDoc('session/state', (d) => { V.state = App.withDefaults(d); render(); });
+    App.db.watchCol('responses', (l) => { V.resp = {}; l.forEach((r) => (V.resp[r.id] = r)); render(); });
+    App.db.watchCol('praises', (l) => { V.praises = l; render(); });
+    App.db.watchDoc('teamManual/current', (d) => { V.team = d; render(); });
+  });
+
+  /* 키보드 ← → 로 우리 팀 사용설명서 슬라이드 넘기기 */
+  addEventListener('keydown', (ev) => {
+    if (!V.state || V.state.stage !== 'team_manual' || !V.team) return;
+    const n = App.splitSlides(V.team.markdown).length;
+    const cur = Math.min(V.state.teamSlide || 0, n - 1);
+    if (ev.key === 'ArrowRight' && cur < n - 1) App.db.set('session/state', { teamSlide: cur + 1 });
+    if (ev.key === 'ArrowLeft' && cur > 0) App.db.set('session/state', { teamSlide: cur - 1 });
+  });
+
+  /* ---------------- 그리기 ---------------- */
+  function render() {
+    if (!V.state) return;
+    const st = V.state.stage;
+    const out = draw(st);
+    const html = '<div class="s-stage ' + out.cls + '">' + out.html + '</div>';
+    const vk = viewKey(st);
+    const newView = vk !== V.lastVk;
+    if (newView) V.seen = {};
+    if (html !== V.lastHtml) {
+      V.lastHtml = html;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const el = tmp.firstElementChild;
+      const old = frame.querySelector('.s-stage:not(.leaving)');
+      if (newView && V.lastVk != null && !reduceMotion) {
+        /* 화면이 바뀔 때: 이전 화면은 흐려지며 사라지고, 새 화면은 차례로 떠오름 */
+        el.classList.add('enter');
+        old.classList.add('leaving');
+        old.after(el);
+        setTimeout(() => old.remove(), 700);
+      } else {
+        old.replaceWith(el);
+        if (newView) el.classList.add('enter');
+      }
+      if (out.after) out.after(el);
+      enhance(el);
+    }
+    V.lastVk = vk;
+    const corner = st === 'manual_person' || st === 'farewell' ? '' : (st === 'lobby' ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>');
+    if (corner !== V.lastCorner) { V.lastCorner = corner; $corner.innerHTML = corner; }
+  }
+
+  let N = App.members.length;
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* 같은 단계 안에서도 사람·슬라이드가 바뀌면 '새 화면'으로 봄 */
+  function viewKey(st) {
+    const s = V.state;
+    if (st === 'emotion_person') return st + ':' + s.emotionCurrent;
+    if (st === 'manual_person') return st + ':' + s.manualCurrent;
+    if (st === 'praise') return st + ':' + s.praiseTarget;
+    if (st === 'team_manual') return st + ':' + (s.teamSlide || 0) + ':' + (V.team ? V.team.pastedAt : '');
+    return st;
+  }
+  /* 새로 들어온 단어·완료 표시·칭찬 카드에만 등장 효과 */
+  function enhance(el) {
+    V.seen = V.seen || {};
+    let n = 0;
+    el.querySelectorAll('[data-pop]').forEach((node) => {
+      const k = node.getAttribute('data-pop');
+      if (V.seen[k]) return;
+      V.seen[k] = true;
+      node.classList.add('pop');
+      node.style.animationDelay = Math.min(n++ * 55, 900) + 'ms';
+    });
+  }
+  const R = (id) => V.resp[id];
+
+  function draw(st) {
+    switch (st) {
+      case 'title': return drawTitle();
+      case 'lobby': return drawLobby();
+      case 'input_emotion': return drawInput('나의 감정 곡선을 입력해 주세요',
+        ['휴대폰 화면을 따라 1월부터 ' + App.MONTH_COUNT + '월까지 채워 주세요', '좋았던 달은 오른쪽(+10), 힘들었던 달은 왼쪽(-10)', '이유는 쓰고 싶은 달만 쓰면 됩니다'], App.done.emotion);
+      case 'emotion_person': return drawEmotionPerson();
+      case 'emotion_team': return drawEmotionTeam();
+      case 'input_manual': return drawInput('나의 사용설명서를 써 주세요',
+        ['나를 제품이라고 생각하고 설명서를 씁니다 (필수 4개)', '다 쓰면 이어서, 배정된 두 분에게 칭찬을 보냅니다', '누가 썼는지는 아무도 알 수 없습니다'], App.done.manual, true);
+      case 'manual_person': return drawManual();
+      case 'praise': return drawPraise();
+      case 'team_manual': return drawTeamManual();
+      case 'input_keyword': return drawInput('2027년, 나의 한 단어',
+        ['내년에 붙잡고 싶은 단어 하나를 올려 주세요', '다 올라오면 우리 팀의 키워드를 함께 봅니다'], App.done.nextYearWord);
+      case 'closing': return drawClosing();
+      case 'farewell': return drawFarewell();
+    }
+    return { cls: '', html: '' };
+  }
+
+  function fmtDate(d) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+    return m ? Number(m[1]) + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일' : '';
+  }
+  function drawTitle() {
+    const meta = [fmtDate(CONFIG.EVENT_DATE), CONFIG.TEAM_NAME].filter(Boolean).join(' · ');
+    return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">' + e(CONFIG.EVENT_SUBTITLE) + '</div><div class="rule"></div>' + (meta ? '<div class="meta">' + e(meta) + '</div>' : '') };
+  }
+
+  function drawLobby() {
+    const joined = App.members.filter((m) => App.done.joined(R(m.id)));
+    const words = App.members.map((m) => (R(m.id) || {}).yearWord).filter(Boolean);
+    return {
+      cls: 's-lobby',
+      html: '<div class="left"><div class="qr-title">지금부터<br>워크숍을 시작합니다</div><div class="bigqr">' + qrImg('참가자 접속 QR') + '</div><div class="qr-guide">휴대폰 카메라로 QR을 찍어 주세요</div>' +
+        '<div class="joined">접속 ' + joined.length + ' / ' + N + '</div>' +
+        '<div class="who">' + App.members.map((m) => '<span class="' + (App.done.joined(R(m.id)) ? 'on' : '') + '"' + (App.done.joined(R(m.id)) ? ' data-pop="j' + m.id + '"' : '') + '>' + e(m.label) + '</span>').join('') + '</div></div>' +
+        '<div class="right"><h1 class="s-h1">2026년, 올해를 한 단어로</h1><p class="s-lead">휴대폰으로 QR을 찍고 이름을 누른 뒤, 떠오르는 단어 하나를 올려 주세요 · ' + words.length + '명 입력</p>' +
+        App.wordWallHtml(words, 's-wall') + '</div>'
+    };
+  }
+
+  function drawInput(title, guide, doneFn, withPraise) {
+    const done = App.members.filter((m) => doneFn(R(m.id))).length;
+    let praiseHtml = '';
+    if (withPraise) {
+      const round = V.state.praiseRound;
+      const sent = App.members.reduce((a, m) => a + App.done.praiseSent(R(m.id), round), 0);
+      praiseHtml = '<div class="count"><small>칭찬</small><em>' + sent + '</em> / ' + N * 2 + '</div>';
+    }
+    return {
+      cls: 's-input',
+      html: '<h1 class="s-h1">' + e(title) + '</h1><ul class="guide">' + guide.map((g) => '<li>' + e(g) + '</li>').join('') + '</ul>' +
+        '<div class="grid">' + App.members.map((m) => '<div class="n ' + (doneFn(R(m.id)) ? 'on' : '') + '"' + (doneFn(R(m.id)) ? ' data-pop="d' + m.id + '"' : '') + '><span class="ck">✓</span>' + e(m.label) + '</div>').join('') + '</div>' +
+        '<div class="bottom"><div class="count"><small>' + (withPraise ? '설명서' : '제출') + '</small><em>' + done + '</em> / ' + N + '</div>' + praiseHtml + '</div>' +
+        '<div class="prog" aria-hidden="true"><i style="width:' + (N ? Math.round((done / N) * 100) : 0) + '%"></i></div>'
+    };
+  }
+
+  /* ---------- 감정 곡선: 한 사람 ---------- */
+  function drawEmotionPerson() {
+    const st = V.state;
+    const id = st.emotionCurrent;
+    if (!id) return { cls: 's-emo', html: '<h1 class="s-h1">감정 곡선 발표</h1><p class="s-lead">곧 시작합니다</p>' };
+    const r = R(id);
+    const months = App.months(r);
+    const sum = App.emotionSummary(r);
+    const idx = st.emotionOrder.indexOf(id) + 1;
+    const head = '<div class="head"><h1 class="s-h1">' + e(App.nim(id)) + '의 2026</h1><span class="s-lead">' + idx + ' / ' + N + '</span></div>';
+    if (!sum) return { cls: 's-emo', html: head + '<p class="s-lead" style="margin-top:120px;text-align:center">아직 감정 곡선을 입력하지 않았습니다</p>' };
+
+    const W = 1728, H = 520, L = 70, T = 56, B = 20, MC = App.MONTH_COUNT;
+    const x = (m) => L + ((m - 0.5) * (W - L)) / MC;
+    const y = (s) => T + ((10 - s) / 20) * (H - T - B);
+    let svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' + '<defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#5FC3CF"/><stop offset="1" stop-color="#9BE3C9"/></linearGradient><filter id="glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
+      '<rect x="' + L + '" y="' + y(10) + '" width="' + (W - L) + '" height="' + (y(0) - y(10)) + '" fill="#3ED598" opacity=".08"/>' +
+      '<rect x="' + L + '" y="' + y(0) + '" width="' + (W - L) + '" height="' + (y(-10) - y(0)) + '" fill="#FF7B73" opacity=".08"/>';
+    [10, 5, 0, -5, -10].forEach((v) => {
+      svg += '<line x1="' + L + '" x2="' + W + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="' + (v === 0 ? '#9AA5B8' : '#2A3550') + '" stroke-width="' + (v === 0 ? 2.5 : 1) + '"/>' +
+        '<text x="' + (L - 14) + '" y="' + (y(v) + 8) + '" text-anchor="end" fill="#9AA5B8" font-size="22">' + App.fmtScore(v) + '</text>';
+    });
+    const pts = months.filter((d) => d.score != null);
+    if (pts.length > 1) svg += '<polyline class="draw" pathLength="1" fill="none" stroke="url(#lg)" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)" points="' + pts.map((d) => x(d.m) + ',' + y(d.score)).join(' ') + '"/>';
+    pts.forEach((d) => {
+      const hi = d.m === sum.best.m, lo = d.m === sum.worst.m;
+      const col = hi ? '#3ED598' : lo ? '#FF7B73' : '#5FC3CF';
+      svg += '<circle class="dot" style="animation-delay:' + (0.25 + d.m * 0.09).toFixed(2) + 's" cx="' + x(d.m) + '" cy="' + y(d.score) + '" r="' + (hi || lo ? 14 : 8) + '" fill="' + col + '" stroke="#0B1220" stroke-width="3"/>' +
+        '<text x="' + x(d.m) + '" y="' + (y(d.score) + (d.score >= 0 ? -24 : 40)) + '" text-anchor="middle" fill="' + (hi || lo ? col : '#D5DBE5') + '" font-size="' + (hi || lo ? 30 : 22) + '" font-weight="800">' + App.fmtScore(d.score) + '</text>';
+    });
+    svg += '</svg>';
+
+    const grid = '<div class="reasons" style="grid-template-columns:repeat(' + MC + ',1fr)">' + months.map((d) =>
+      '<div class="' + (d.m === sum.best.m ? 'hi' : d.m === sum.worst.m ? 'lo' : '') + '"><b>' + d.m + '월' + (d.m === sum.best.m ? ' · 최고' : d.m === sum.worst.m ? ' · 최저' : '') + '</b>' + e(d.reason || '') + '</div>').join('') + '</div>';
+    const em = (r && r.emotion) || {};
+    const foot = (em.bestMoment || em.lowestLesson) ? '<div class="foot">' +
+      (em.bestMoment ? '<div><span>올해 가장 좋았던 순간</span>' + e(em.bestMoment) + '</div>' : '') +
+      (em.lowestLesson ? '<div><span>힘들었던 순간에서 배운 것</span>' + e(em.lowestLesson) + '</div>' : '') + '</div>' : '';
+    return { cls: 's-emo', html: head + '<div class="chart">' + svg + '</div>' + grid + foot };
+  }
+
+  /* ---------- 감정 곡선: 팀 전체 ---------- */
+  function teamStats() {
+    const people = App.members.map((m) => ({ m, months: App.months(R(m.id)) })).filter((p) => p.months.some((d) => d.score != null));
+    const stats = Array.from({ length: App.MONTH_COUNT }, (_, i) => {
+      const vals = people.map((p) => p.months[i].score).filter((v) => v != null);
+      if (!vals.length) return null;
+      const avg = vals.reduce((a, v) => a + v, 0) / vals.length;
+      const sd = Math.sqrt(vals.reduce((a, v) => a + (v - avg) * (v - avg), 0) / vals.length);
+      return { m: i + 1, avg, sd, n: vals.length };
+    });
+    return { people, stats };
+  }
+  function drawEmotionTeam() {
+    const { people, stats } = teamStats();
+    const head = '<div><h1 class="s-h1">우리 팀의 2026</h1><p class="s-lead">' + N + '명 중 ' + people.length + '명의 곡선 · 굵은 노란 선이 팀 평균입니다</p></div>';
+    if (!people.length) return { cls: 's-team', html: head + '<p class="s-lead" style="margin-top:120px">아직 입력된 곡선이 없습니다</p>' };
+    const valid = stats.filter(Boolean);
+    const best = valid.reduce((a, s) => (s.avg > a.avg ? s : a), valid[0]);
+    const worst = valid.reduce((a, s) => (s.avg < a.avg ? s : a), valid[0]);
+    const multi = valid.filter((s) => s.n > 1);
+    const split = multi.length ? multi.reduce((a, s) => (s.sd > a.sd ? s : a), multi[0]) : null;
+
+    const W = 1268, H = 760, L = 60, T = 24, B = 50, MC = App.MONTH_COUNT;
+    const x = (m) => L + ((m - 0.5) * (W - L)) / MC;
+    const y = (s) => T + ((10 - s) / 20) * (H - T - B);
+    let svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' + '<defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#5FC3CF"/><stop offset="1" stop-color="#9BE3C9"/></linearGradient><filter id="glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+    [10, 5, 0, -5, -10].forEach((v) => {
+      svg += '<line x1="' + L + '" x2="' + W + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="' + (v === 0 ? '#9AA5B8' : '#2A3550') + '" stroke-width="' + (v === 0 ? 2.5 : 1) + '"/>' +
+        '<text x="' + (L - 12) + '" y="' + (y(v) + 7) + '" text-anchor="end" fill="#9AA5B8" font-size="20">' + App.fmtScore(v) + '</text>';
+    });
+    if (V.selMonth) svg += '<rect x="' + (x(V.selMonth) - (W - L) / MC / 2) + '" y="' + T + '" width="' + (W - L) / MC + '" height="' + (H - T - B) + '" fill="#5FC3CF" opacity=".12"/>';
+    for (let m = 1; m <= MC; m++) svg += '<text x="' + x(m) + '" y="' + (H - 14) + '" text-anchor="middle" fill="#9AA5B8" font-size="22">' + m + '월</text>';
+    people.forEach((p, pi) => {
+      const pts = p.months.filter((d) => d.score != null);
+      if (pts.length > 1) svg += '<polyline class="draw" pathLength="1" style="animation-delay:' + (pi * 0.06).toFixed(2) + 's" fill="none" stroke="#5FC3CF" stroke-opacity=".30" stroke-width="3" stroke-linejoin="round" points="' + pts.map((d) => x(d.m) + ',' + y(d.score)).join(' ') + '"/>';
+    });
+    svg += '<polyline class="draw slow" pathLength="1" fill="none" stroke="#FFD166" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)" points="' + valid.map((s) => x(s.m) + ',' + y(s.avg)).join(' ') + '"/>';
+    valid.forEach((s) => (svg += '<circle cx="' + x(s.m) + '" cy="' + y(s.avg) + '" r="8" fill="#FFD166" stroke="#0F1626" stroke-width="3"/>'));
+    svg += '</svg>';
+
+    const card = (k, s, d) => (s ? '<button type="button" class="card' + (V.selMonth === s.m ? ' sel' : '') + '" data-m="' + s.m + '"><div class="k">' + k + '</div><div class="v">' + s.m + '월</div><div class="d">' + d + ' · 눌러서 이유 보기</div></button>' : '');
+    let pop = '';
+    if (V.selMonth) {
+      const rows = people.map((p) => ({ label: p.m.label, d: p.months[V.selMonth - 1] })).filter((r) => r.d.score != null).sort((a, b) => b.d.score - a.d.score);
+      pop = '<div class="reasons-pop"><h3>' + V.selMonth + '월, 우리는</h3>' + rows.map((r) => '<div><b>' + e(r.label) + ' ' + App.fmtScore(r.d.score) + '</b> ' + e(r.d.reason || '') + '</div>').join('') + '</div>';
+    }
+    return {
+      cls: 's-team',
+      html: head + '<div class="body"><div class="chart">' + svg + '</div><div class="cards">' +
+        card('우리 팀이 가장 좋았던 달', best, '평균 ' + App.fmtScore(Math.round(best.avg * 10) / 10)) +
+        card('가장 힘들었던 달', worst, '평균 ' + App.fmtScore(Math.round(worst.avg * 10) / 10)) +
+        card('가장 엇갈린 달', split, split ? '편차 ' + (Math.round(split.sd * 10) / 10) : '') + '</div></div>' + pop,
+      after: (el) => el.querySelectorAll('.card').forEach((b) => (b.onclick = () => { const m = Number(b.dataset.m); V.selMonth = V.selMonth === m ? null : m; render(); }))
+    };
+  }
+
+  /* ---------- 사용설명서 ---------- */
+  function drawManual() {
+    const st = V.state;
+    const id = st.manualCurrent;
+    if (!id) return { cls: '', html: '<h1 class="s-h1">누구의 설명서일까요?</h1><p class="s-lead">곧 시작합니다</p>' };
+    const r = R(id);
+    const idx = st.manualOrder.indexOf(id) + 1;
+    if (!r || !r.manual) return { cls: '', html: '<h1 class="s-h1">' + (st.manualRevealed ? e(App.nim(id)) + '의 설명서' : '누구의 설명서일까요?') + '</h1><p class="s-lead">아직 설명서를 쓰지 않았습니다 · ' + idx + ' / ' + N + '</p>' };
+    return { cls: 's-manual', html: robotManualHtml(id, r.manual, !st.manualRevealed, idx), after: robotAfter };
+  }
+
+  /* ---------- 사용설명서: 3단 제품 매뉴얼 ---------- */
+  /* 번호는 로봇 몸의 번호표와 짝 */
+  /* 칸 제목 앞 작은 부위 그림 (손·톱니·얼굴·경고·안테나·배터리) */
+  const ICO = {
+    strengths: '<rect x="9" y="2" width="6" height="11" rx="3"/><circle cx="12" cy="17" r="5"/>',
+    workStyle: '<circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+    personality: '<rect x="3" y="4" width="18" height="16" rx="6"/><circle cx="9" cy="11" r="1.2" fill="currentColor"/><circle cx="15" cy="11" r="1.2" fill="currentColor"/><path d="M9.5 15q2.5 2 5 0"/>',
+    respect: '<path d="M12 3L22 20H2Z"/><path d="M12 10v4.5M12 17.2v.3"/>',
+    tiredSignal: '<circle cx="12" cy="5" r="2.5"/><path d="M12 7.5V21M7 3.5q-2 1.5 0 3.5M17 3.5q2 1.5 0 3.5"/>',
+    recharge: '<rect x="2.5" y="7" width="17" height="10" rx="2.5"/><path d="M21.5 10.5v3"/><path d="M11.5 8.5l-3 4h4l-3 4"/>'
+  };
+  const icon = (k) => '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">' + ICO[k] + '</svg>';
+  const MANUAL_SECS = [
+    { k: 'strengths', t: '주요 기능', list: true },
+    { k: 'workStyle', t: '작동 방식' },
+    { k: 'personality', t: '제품 특성' },
+    { k: 'respect', t: '주의사항 — 이것만큼은 지켜주세요', warn: true },
+    { k: 'tiredSignal', t: '고장 신호' },
+    { k: 'recharge', t: '충전 방법' }
+  ];
+  function robotSvg(screenText, hidden) {
+    /* 흑백 선화 로봇 이미지(img 폴더) 위에, 가슴 칸 각도에 맞춰 MBTI 글자를 얹음 */
+    const img = (cls, src) => '<image class="' + cls + '" href="img/' + src + '" x="0" y="0" width="646" height="1120"/>';
+    const size = screenText.length > 2 ? 40 : 56;
+    return '<svg class="robot' + (hidden ? '' : ' revealed') + '" viewBox="0 0 646 1120" aria-hidden="true">' +
+      (hidden ? img('rb-base', 'robot.png') : img('rb-base', 'robot.png') + img('rb-wave', 'robot-wave.png')) +
+      /* 가슴 칸 네 모서리(이미지 좌표)에 맞춘 기울기: 왼쪽 위 (227,475), 오른쪽 위 (386,491), 왼쪽 아래 (220,587) */
+      '<g transform="matrix(0.994,0.1,-0.0625,1,227,475)"><text class="rb-mbti" x="80" y="58" text-anchor="middle" dominant-baseline="central" font-size="' + size + '" font-weight="800" letter-spacing="3" fill="#1A2233" font-family="Pretendard, sans-serif">' + App.esc(screenText) + '</text></g>' +
+      '</svg>';
+  }
+
+  function warrantyHtml(id, mn, hidden, idx) {
+    const mbti = (mn.mbti || '').trim().toUpperCase();
+    const serial = 'MS-2026-' + String(idx).padStart(2, '0') + (mbti && !hidden ? '-' + mbti : '');
+    const row = (k, v) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>';
+    return '<div class="wty"><div class="wt">제품 보증서 <span>WARRANTY</span></div><table>' +
+      row('제품명', hidden ? '? ? ? ? ?' : e(App.label(id))) +
+      row('일련번호', e(serial)) +
+      row('보증 기간', '2027년 한 해 동안, 함께 일하는 모든 날') +
+      row('무상 수리', '커피 한 잔, 진심 어린 "고마워요" 한마디') +
+      row('보증 제외', '⚠ 주의사항을 지키지 않아 생긴 고장') +
+      '</table><p class="wn">본 제품은 동료의 칭찬을 받을수록 성능이 좋아집니다.</p><div class="stamp">품질 검사<br><b>합격</b><br>2026 캔미팅</div></div>';
+  }
+  function robotManualHtml(id, mn, hidden, idx) {
+    mn = mn || {};
+    const mbti = (mn.mbti || '').trim().toUpperCase();
+    const box = (p, i) => {
+      const raw = p.list ? (mn.strengths || []).filter((s) => (s || '').trim()) : (mn[p.k] || '').trim();
+      const val = p.list ? (raw.length ? '<ul>' + raw.map((s) => '<li>' + e(s.trim()) + '</li>').join('') + '</ul>' : '—') : (raw ? e(raw) : '—');
+      return '<div class="box' + (p.warn ? ' warn' : '') + '"><div class="k">' + icon(p.k) + p.t + '</div><div class="v">' + val + '</div></div>';
+    };
+    const name = hidden
+      ? '<div class="nm hidden-name">? ? ? ? ?</div><div class="guess">누구의 설명서일까요?</div>'
+      : '<div class="reveal"><div class="nm">' + e(App.label(id)) + '</div>' + ((mn.nickname || '').trim() ? '<div class="nick">"' + e(mn.nickname.trim()) + '"</div>' : '') + '</div>';
+    return '<div class="rb3">' +
+      '<div class="c1"><div class="eyebrow">USER MANUAL · 2026 EDITION</div><div class="ttl">사용설명서</div>' + name +
+        '<div class="model">MODEL ' + (hidden ? '????' : (mbti ? e(mbti) : '—')) + '</div>' +
+        '<div class="rbox">' + robotSvg(hidden ? '?' : (mbti || '♥'), hidden) + '</div>' +
+        '<div class="foot"><div class="bar" aria-hidden="true"></div><div class="pg">' + idx + ' / ' + N + '</div></div></div>' +
+      '<div class="c2 col">' + MANUAL_SECS.slice(0, 3).map((p, i) => box(p, i)).join('') + '</div>' +
+      '<div class="c3"><div class="col">' + MANUAL_SECS.slice(3).map((p, i) => box(p, i + 3)).join('') + '</div>' + warrantyHtml(id, mn, hidden, idx) + '</div>' +
+      '</div>';
+  }
+  function robotAfter(el) {
+    /* 글이 길면 글자 크기를 줄여 칸에 맞춤 */
+    el.querySelectorAll('.col').forEach((col) => {
+      let size = 32;
+      col.style.fontSize = size + 'px';
+      while (col.scrollHeight > col.clientHeight + 2 && size > 16) { size -= 1; col.style.fontSize = size + 'px'; }
+    });
+  }
+
+
+  /* ---------- 칭찬 공개 ---------- */
+  function drawPraise() {
+    const st = V.state;
+    if (!st.praiseTarget) return { cls: 's-praise', html: '<h1 class="s-h1">칭찬을 공개합니다</h1><p class="s-lead">누가 썼는지는 아무도 모릅니다. 한 사람씩, 도착한 칭찬을 함께 읽습니다</p>' };
+    const id = st.praiseTarget;
+    const total = V.praises.filter((p) => p.toId === id && p.round === st.praiseRound).length;
+    const shown = (st.revealedPraises || []).filter((p) => p.toId === id);
+    const slots = Math.max(total, shown.length);
+    let cards = '';
+    for (let i = 0; i < slots; i++) cards += shown[i] ? '<div class="pc front" data-pop="p' + shown[i].id + '">' + e(shown[i].text) + '</div>' : '<div class="pc back">?</div>';
+    const o = st.praiseOrder, i = o.indexOf(id);
+    return {
+      cls: 's-praise',
+      html: '<h1 class="s-h1">' + e(App.nim(id)) + '에게 도착한 칭찬</h1>' +
+        (slots ? '<div class="cards">' + cards + '</div>' : '<p class="s-lead">아직 도착한 칭찬이 없습니다</p>') +
+        '<div class="next">' + (i + 1) + ' / ' + N + '</div>'
+    };
+  }
+
+  /* ---------- 우리 팀 사용설명서 슬라이드 ---------- */
+  function drawTeamManual() {
+    if (!V.team || !V.team.markdown) return { cls: 's-slide cover', html: '<h1 class="s-h1">우리 팀 사용설명서</h1><p class="s-lead">만들고 있습니다. 잠시만 기다려 주세요</p>' };
+    const slides = App.splitSlides(V.team.markdown);
+    const cur = Math.min(Math.max(0, V.state.teamSlide || 0), slides.length - 1);
+    const s = slides[cur];
+    const page = '<div class="page">' + (cur + 1) + ' / ' + slides.length + '</div>';
+    if (s.cover) return { cls: 's-slide cover', html: '<h1 class="s-h1 fade-in">' + e(s.title) + '</h1>' + (s.body.trim() ? '<div class="body" style="flex:none;max-width:1400px">' + App.md(s.body) + '</div>' : '<p class="s-lead">← → 로 넘깁니다</p>') + page };
+    return {
+      cls: 's-slide',
+      html: '<h1 class="s-h1">' + e(s.title) + '</h1><div class="body" id="sbody">' + App.md(s.body) + '</div>' + page,
+      after: (el) => fitText(el.querySelector('#sbody'))
+    };
+  }
+  function fitText(b) {
+    if (!b) return;
+    let size = 36;
+    b.style.fontSize = size + 'px';
+    while (b.scrollHeight > b.clientHeight + 2 && size > 24) { size -= 1; b.style.fontSize = size + 'px'; }
+    if (b.scrollHeight > b.clientHeight + 2) {
+      b.style.columnCount = 2; size = 32; b.style.fontSize = size + 'px';
+      while (b.scrollWidth > b.clientWidth + 2 && size > 18) { size -= 1; b.style.fontSize = size + 'px'; }
+      while (b.scrollHeight > b.clientHeight + 2 && size > 18) { size -= 1; b.style.fontSize = size + 'px'; }
+    }
+  }
+
+  /* ---------- 클로징 ---------- */
+  /* ---------- 클로징: 내년 키워드 ---------- */
+  function drawClosing() {
+    const words = App.members.map((m) => (R(m.id) || {}).nextYearWord).filter(Boolean);
+    return {
+      cls: 's-closing',
+      html: '<h1 class="s-h1">2027년, 우리 팀의 키워드</h1><p class="s-lead">' + words.length + '명의 한 단어</p>' +
+        '<div style="flex:1;display:flex;align-items:center;justify-content:center">' + App.wordWallHtml(words, 's-wall') + '</div>'
+    };
+  }
+
+  /* ---------- 담당님 마무리 인사 ---------- */
+  function drawFarewell() {
+    return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">Wrap-up</div>' };
+  }
+})();
+</script>
+</body>
+</html>
