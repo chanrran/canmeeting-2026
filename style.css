@@ -509,3 +509,5 @@ body.p { background: linear-gradient(180deg, #EEF6F8 0%, #FAFBFC 240px); }
 .tm-nav button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #fff; font-size: 40px; line-height: 1; cursor: pointer; transition: background .2s, opacity .2s; }
 .tm-nav button:hover:not(:disabled) { background: rgba(95,195,207,.35); }
 .tm-nav button:disabled { opacity: .25; cursor: default; }
+
+.s-title .opening { font-size: 44px; font-weight: 700; letter-spacing: .3em; color: var(--s-mute); margin-top: 28px; padding-left: .3em; }
