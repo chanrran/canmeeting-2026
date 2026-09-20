@@ -308,6 +308,87 @@
     return map;
   };
 
+  /* 한 사람이 쓰고 받는 칭찬 수: 5명 이상이면 2개, 그보다 적으면 1개 */
+  App.praisePer = (n) => (n > 4 ? 2 : 1);
+  /* 이번 배정에서 써야 할 칭찬의 총 개수 (보통 인원 × 2) */
+  App.praiseTotal = (st) => {
+    const a = st && st.praiseAssignments;
+    if (!a) return App.members.length * App.praisePer(App.members.length);
+    return App.memberIds.reduce((sum, id) => sum + ((a[id] || []).length), 0);
+  };
+  /* 배정표가 규칙을 지키는지 검사
+     - 모두 정확히 per개를 받음 (가장 중요한 약속)
+     - 쓰는 수: strict면 모두 정확히 per개. 명단이 바뀐 경우에는 조금 달라질 수 있음(repair 참고)
+     - 본인에게 쓰지 않음, 같은 사람에게 두 번 쓰지 않음, 서로 맞칭찬하지 않음 */
+  App.checkAssignments = (map, ids, strict, allowMutual) => {
+    ids = ids || App.memberIds;
+    const per = App.praisePer(ids.length);
+    if (!map || Object.keys(map).length !== ids.length) return false;
+    const rec = {};
+    for (const a of ids) {
+      const t = map[a];
+      if (!t || (strict && t.length !== per) || new Set(t).size !== t.length) return false;
+      for (const b of t) {
+        if (b === a || !ids.includes(b)) return false;
+        if (per > 1 && !allowMutual && (map[b] || []).includes(a)) return false;
+        rec[b] = (rec[b] || 0) + 1;
+      }
+    }
+    return ids.every((id) => rec[id] === per);
+  };
+  /* 명단이 바뀌었을 때 배정을 다시 맞춤
+     - 이미 보낸 칭찬(sentBy)은 절대 버리지 않음 (명단에서 빠진 분에게 보낸 것만 제외)
+     - 예전 배정 중 아직 안 쓴 것도 되도록 유지
+     - 모두가 정확히 per개를 받도록 맞춤. 쓰는 수도 되도록 per개로 맞추되,
+       이미 모두 다 써서 자리가 없으면 몇 분이 1개를 더 쓰고, 늦게 합류한 분은 덜 쓸 수 있음
+     sentBy = { 보낸사람id: [받는사람id, ...] } */
+  App.repairAssignments = (oldMap, sentBy) => {
+    const ids = App.memberIds.slice();
+    const n = ids.length, per = App.praisePer(n);
+    oldMap = oldMap || {}; sentBy = sentBy || {};
+    const fixed = {};
+    ids.forEach((a) => { fixed[a] = Array.from(new Set((sentBy[a] || []).filter((b) => b !== a && ids.includes(b)))); });
+    let best = null, bestCost = Infinity;
+    /* 아주 적은 인원에서 맞칭찬 없이 맞출 수 없을 때만 맞칭찬을 허용 */
+    for (const allowMutual of [false, true]) {
+    if (best) break;
+    for (let tries = 0; tries < 300 && bestCost > 0; tries++) {
+      const out = {}, inc = {};
+      ids.forEach((a) => { out[a] = fixed[a].slice(); inc[a] = 0; });
+      ids.forEach((a) => out[a].forEach((b) => inc[b]++));
+      if (ids.some((b) => inc[b] > per)) return null;
+      const can = (a, b) => b !== a && !out[a].includes(b) && inc[b] < per && !(per > 1 && !allowMutual && out[b].includes(a));
+      /* 1) 예전 배정 중 유효한 것 유지 */
+      App.shuffle(ids).forEach((a) => (oldMap[a] || []).forEach((b) => { if (out[a].length < per && ids.includes(b) && can(a, b)) { out[a].push(b); inc[b]++; } }));
+      /* 2) 각자 per개가 될 때까지 채움 (받을 자리가 남은 분에게) */
+      for (const a of App.shuffle(ids)) {
+        while (out[a].length < per) {
+          const c = App.shuffle(ids.filter((b) => can(a, b))).sort((x, y) => inc[x] - inc[y]);
+          if (!c.length) break;
+          out[a].push(c[0]); inc[c[0]]++;
+        }
+      }
+      /* 3) 아직 per개를 못 받는 분이 있으면, 가장 적게 쓴 분에게 1개 더 배정 */
+      let fail = false;
+      const outOf = (x) => out[x].length;
+      for (const b of App.shuffle(ids)) {
+        while (inc[b] < per) {
+          const w = App.shuffle(ids.filter((a) => a !== b && !out[a].includes(b) && !(per > 1 && !allowMutual && out[b].includes(a)))).sort((x, y) => out[x].length - out[y].length);
+          if (!w.length) { fail = true; break; }
+          out[w[0]].push(b); inc[b]++;
+        }
+        if (fail) break;
+      }
+      if (fail || !App.checkAssignments(out, ids, false, allowMutual)) continue;
+      /* 비용: 쓰는 수가 per에서 벗어난 만큼(크게) + 예전과 달라진 배정 수(작게) */
+      let cost = 0;
+      ids.forEach((a) => { cost += Math.abs(outOf(a) - per) * 100; out[a].forEach((b) => { if (!fixed[a].includes(b) && !(oldMap[a] || []).includes(b)) cost++; }); });
+      if (cost < bestCost) { best = out; bestCost = cost; }
+    }
+    }
+    return best;
+  };
+
   /* 아주 간단한 마크다운 표시 */
   App.md = (src) => {
     const inline = (s) => App.esc(s)
