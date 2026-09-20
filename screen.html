@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260920b">
+<link rel="stylesheet" href="style.css?v=20260920c">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -16,9 +16,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260920b"></script>
-<script src="config.js?v=20260920b"></script>
-<script src="app.js?v=20260920b"></script>
+<script src="qrcode.js?v=20260920c"></script>
+<script src="config.js?v=20260920c"></script>
+<script src="app.js?v=20260920c"></script>
 <script>
 (function () {
   'use strict';
@@ -105,7 +105,7 @@
       enhance(el);
     }
     V.lastVk = vk;
-    const corner = st === 'manual_person' || st === 'farewell' ? '' : (st === 'lobby' ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>');
+    const corner = st === 'title' || st === 'manual_person' || st === 'farewell' ? '' : (st === 'lobby' ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>');
     if (corner !== V.lastCorner) { V.lastCorner = corner; $corner.innerHTML = corner; }
   }
 
@@ -161,7 +161,7 @@
   }
   function drawTitle() {
     const meta = [fmtDate(CONFIG.EVENT_DATE), CONFIG.TEAM_NAME].filter(Boolean).join(' · ');
-    return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">' + e(CONFIG.EVENT_SUBTITLE) + '</div><div class="rule"></div>' + (meta ? '<div class="meta">' + e(meta) + '</div>' : '') };
+    return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">' + e(CONFIG.EVENT_SUBTITLE) + '</div><div class="rule"></div>' + (meta ? '<div class="meta">' + e(meta) + '</div>' : '') + '<div class="opening">Opening</div>' };
   }
 
   function drawLobby() {
