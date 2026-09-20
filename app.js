@@ -347,6 +347,33 @@
     return [{ title: cover.title, body: cover.body.join('\n'), cover: true }].concat(slides.map((s) => ({ title: s.title, body: s.body.join('\n') })));
   };
 
+  /* 붙여넣은 결과를 요약 화면 3장과 전문으로 나눔
+     [요약] [화면 1..3] [전문] 표시가 없으면 예전 방식(## 제목 단위)으로 나눔 */
+  App.parseTeam = (raw) => {
+    const text = String(raw || '').replace(/\r/g, '').split('\n').filter((l) => !/^\s*```/.test(l)).join('\n').trim();
+    const iFull = text.search(/^\s*\[전문\]\s*$/m);
+    const summaryPart = iFull >= 0 ? text.slice(0, iFull) : text;
+    const full = iFull >= 0 ? text.slice(iFull).replace(/^\s*\[전문\]\s*\n?/, '').trim() : '';
+    const screens = [];
+    let cur = null;
+    summaryPart.split('\n').forEach((line) => {
+      const t = line.trim().replace(/\*\*/g, '');
+      let m;
+      if (!t || /^\[요약\]$/.test(t)) return;
+      if ((m = /^\[화면\s*\d+\]\s*(.*)$/.exec(t))) { cur = { title: m[1].trim(), conclusion: '', items: [] }; screens.push(cur); return; }
+      if (!cur) return;
+      if ((m = /^결론\s*[:：]\s*(.*)$/.exec(t))) { cur.conclusion = m[1].trim(); return; }
+      if ((m = /^(?:[-*•·]|\d+[.)])\s*(.*)$/.exec(t))) {
+        const parts = m[1].split(/\s*[|｜]\s*/);
+        cur.items.push({ t: parts[0].trim(), d: parts.slice(1).join(' ').trim() });
+        return;
+      }
+      if (!cur.conclusion) cur.conclusion = t;
+    });
+    if (screens.length) return { mode: 'summary', slides: screens, full: full };
+    return { mode: 'legacy', slides: App.splitSlides(text), full: text };
+  };
+
   /* 우리 팀 사용설명서 완성 프롬프트 */
   App.buildPrompt = (responsesById) => {
     const missing = [];
