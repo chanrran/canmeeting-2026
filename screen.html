@@ -55,6 +55,18 @@
     App.db.watchDoc('teamManual/current', (d) => { V.team = d; render(); });
   });
 
+  /* 화면의 ‹ › 버튼으로 넘기기 */
+  function moveTeamSlide(d) {
+    if (!V.state || V.state.stage !== 'team_manual' || !V.team) return;
+    const n = App.parseTeam(V.team.markdown).slides.length;
+    const cur = Math.min(V.state.teamSlide || 0, n - 1);
+    const nx = cur + d;
+    if (nx >= 0 && nx < n) App.db.set('session/state', { teamSlide: nx });
+  }
+  /* 큰 화면은 절대 스크롤되지 않게 고정 */
+  document.addEventListener('scroll', (ev) => { const t = ev.target === document ? document.scrollingElement : ev.target; if (t && (t.scrollTop || t.scrollLeft)) { t.scrollTop = 0; t.scrollLeft = 0; } }, true);
+  document.addEventListener('mousedown', (ev) => { if (ev.target.closest('[data-tm]')) ev.preventDefault(); });
+  document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-tm]'); if (b && !b.disabled) moveTeamSlide(Number(b.dataset.tm)); });
   /* 키보드 ← → 로 우리 팀 사용설명서 슬라이드 넘기기 */
   addEventListener('keydown', (ev) => {
     if (!V.state || V.state.stage !== 'team_manual' || !V.team) return;
@@ -389,16 +401,17 @@
     const slides = P.slides;
     const cur = Math.min(Math.max(0, V.state.teamSlide || 0), slides.length - 1);
     const s = slides[cur];
-    const page = '<div class="page">' + (cur + 1) + ' / ' + slides.length + '</div>';
+    /* 화면 아래 이전·다음 버튼 (키보드 ← → 도 됨) */
+    const page = '<div class="tm-nav"><button type="button" data-tm="-1"' + (cur <= 0 ? ' disabled' : '') + ' aria-label="이전">‹</button><span>' + (cur + 1) + ' / ' + slides.length + '</span><button type="button" data-tm="1"' + (cur >= slides.length - 1 ? ' disabled' : '') + ' aria-label="다음">›</button></div>';
     if (P.mode === 'summary') {
       /* 요약 화면: 제목 → 결론 한 문장 → 항목 카드 3개 */
       return {
         cls: 's-slide tm',
-        html: '<div class="tm-eyebrow" data-pop>우리 팀 사용설명서 · ' + (cur + 1) + ' / ' + slides.length + '</div>' +
+        html: '<div class="tm-eyebrow" data-pop>우리 팀 사용설명서</div>' +
           '<h1 class="s-h1" data-pop>' + e(s.title) + '</h1>' +
           (s.conclusion ? '<div class="tm-conc" data-pop>' + e(s.conclusion) + '</div>' : '') +
           '<div class="tm-items">' + s.items.slice(0, 4).map((it, i) =>
-            '<div class="tm-item" data-pop><div class="n">' + (i + 1) + '</div><div class="t">' + e(it.t) + '</div>' + (it.d ? '<div class="d">' + e(it.d) + '</div>' : '') + '</div>').join('') + '</div>'
+            '<div class="tm-item" data-pop><div class="n">' + (i + 1) + '</div><div class="t">' + e(it.t) + '</div>' + (it.d ? '<div class="d">' + e(it.d) + '</div>' : '') + '</div>').join('') + '</div>' + page
       };
     }
     if (s.cover) return { cls: 's-slide cover', html: '<h1 class="s-h1 fade-in">' + e(s.title) + '</h1>' + (s.body.trim() ? '<div class="body" style="flex:none;max-width:1400px">' + App.md(s.body) + '</div>' : '<p class="s-lead">← → 로 넘깁니다</p>') + page };
