@@ -58,7 +58,7 @@
   /* 키보드 ← → 로 우리 팀 사용설명서 슬라이드 넘기기 */
   addEventListener('keydown', (ev) => {
     if (!V.state || V.state.stage !== 'team_manual' || !V.team) return;
-    const n = App.splitSlides(V.team.markdown).length;
+    const n = App.parseTeam(V.team.markdown).slides.length;
     const cur = Math.min(V.state.teamSlide || 0, n - 1);
     if (ev.key === 'ArrowRight' && cur < n - 1) App.db.set('session/state', { teamSlide: cur + 1 });
     if (ev.key === 'ArrowLeft' && cur > 0) App.db.set('session/state', { teamSlide: cur - 1 });
@@ -385,10 +385,22 @@
   /* ---------- 우리 팀 사용설명서 슬라이드 ---------- */
   function drawTeamManual() {
     if (!V.team || !V.team.markdown) return { cls: 's-slide cover', html: '<h1 class="s-h1">우리 팀 사용설명서</h1><p class="s-lead">만들고 있습니다. 잠시만 기다려 주세요</p>' };
-    const slides = App.splitSlides(V.team.markdown);
+    const P = App.parseTeam(V.team.markdown);
+    const slides = P.slides;
     const cur = Math.min(Math.max(0, V.state.teamSlide || 0), slides.length - 1);
     const s = slides[cur];
     const page = '<div class="page">' + (cur + 1) + ' / ' + slides.length + '</div>';
+    if (P.mode === 'summary') {
+      /* 요약 화면: 제목 → 결론 한 문장 → 항목 카드 3개 */
+      return {
+        cls: 's-slide tm',
+        html: '<div class="tm-eyebrow" data-pop>우리 팀 사용설명서 · ' + (cur + 1) + ' / ' + slides.length + '</div>' +
+          '<h1 class="s-h1" data-pop>' + e(s.title) + '</h1>' +
+          (s.conclusion ? '<div class="tm-conc" data-pop>' + e(s.conclusion) + '</div>' : '') +
+          '<div class="tm-items">' + s.items.slice(0, 4).map((it, i) =>
+            '<div class="tm-item" data-pop><div class="n">' + (i + 1) + '</div><div class="t">' + e(it.t) + '</div>' + (it.d ? '<div class="d">' + e(it.d) + '</div>' : '') + '</div>').join('') + '</div>'
+      };
+    }
     if (s.cover) return { cls: 's-slide cover', html: '<h1 class="s-h1 fade-in">' + e(s.title) + '</h1>' + (s.body.trim() ? '<div class="body" style="flex:none;max-width:1400px">' + App.md(s.body) + '</div>' : '<p class="s-lead">← → 로 넘깁니다</p>') + page };
     return {
       cls: 's-slide',
