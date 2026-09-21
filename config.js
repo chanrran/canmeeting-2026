@@ -47,9 +47,58 @@ window.CONFIG = {
     { name: "양다은", role: "RF" },
     { name: "양하준", role: "RF" },
     { name: "이화연", role: "RF" },
-    { name: "조민호", role: "RF" },
     { name: "추현준", role: "RF" },
     { name: "이주희", role: "RA" }
+  ],
+
+  /* 6) 팝업 퀴즈 5문항
+        - input: 참가자에게 먼저 받는 값 (퀴즈 주제는 알려 주지 않음)
+        - question: 큰 화면에 띄우는 문제
+        - points: 맞힌 분들 중 빠른 순서대로 주는 점수 */
+  WORD_SECONDS: 30,   // 마무리 한마디 1인 시간(초)
+  QUIZ_SECONDS: 10,
+  QUIZ_EXCLUDE: ["조영찬"],   // 점수·순위에서 빼는 분 (문제를 내는 분)
+  QUIZZES: [
+    {
+      id: "blood",
+      inputTitle: "여러분의 혈액형을 골라 주세요",
+      input: { kind: "choice", options: ["A형", "B형", "O형", "AB형"] },
+      question: "우리 팀에 가장 많은 혈액형은?",
+      answer: { kind: "mode" },
+      points: [50, 30, 10]
+    },
+    {
+      id: "zodiac",
+      inputTitle: "여러분의 띠를 골라 주세요",
+      input: { kind: "choice", options: ["쥐", "소", "호랑이", "토끼", "용", "뱀", "말", "양", "원숭이", "닭", "개", "돼지"] },
+      question: "우리 팀에서 가장 많이 나온 띠는?",
+      answer: { kind: "mode", choiceCount: 4 },
+      points: [70, 50, 30]
+    },
+    {
+      id: "birth",
+      inputTitle: "여러분이 태어난 달을 골라 주세요",
+      input: { kind: "choice", options: ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"] },
+      question: "조영찬 팀장님의 생일은?",
+      answer: { kind: "fixed", value: "1월 13일", choices: ["12월 18일", "1월 13일", "5월 6일", "8월 9일"] },
+      points: [100, 80, 50]
+    },
+    {
+      id: "foot",
+      inputTitle: "여러분의 발 사이즈를 골라 주세요 (5밀리미터 단위)",
+      input: { kind: "step", min: 210, max: 300, step: 5, unit: "", start: 260 },
+      question: "우리 팀에서 가장 큰 발 사이즈는?",
+      answer: { kind: "max", gap: 5 },
+      points: [200, 100, 50]
+    },
+    {
+      id: "career",
+      inputTitle: "여러분의 근무 경력을 햇수로 골라 주세요 (반올림)",
+      input: { kind: "step", min: 0, max: 45, step: 1, unit: "년", start: 10 },
+      question: "우리 팀의 근무 경력을 모두 더하면 몇 년일까요?",
+      answer: { kind: "sum", gap: 1, unit: "년" },
+      points: [300, 200, 100]
+    }
   ],
 
   /* 6) 우리 팀 사용설명서 기초 프롬프트
