@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260921b">
+<link rel="stylesheet" href="style.css?v=20260921c">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -16,9 +16,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260921b"></script>
-<script src="config.js?v=20260921b"></script>
-<script src="app.js?v=20260921b"></script>
+<script src="qrcode.js?v=20260921c"></script>
+<script src="config.js?v=20260921c"></script>
+<script src="app.js?v=20260921c"></script>
 <script>
 (function () {
   'use strict';
@@ -171,13 +171,16 @@
   function quizAnswered(qid) { return App.members.filter((m) => (((R(m.id) || {}).quizPick || {})[qid] || {}).pick != null).length; }
   function quizFilled(qid) { return App.members.filter((m) => { const v = ((R(m.id) || {}).quiz || {})[qid]; return v != null && v !== ''; }).length; }
   function nameList(ids) { return ids.map((id) => e(App.label(id))).join(', '); }
-  function qBars(rows, answer) {
+  function qBars(rows, answer, namesOf) {
     const max = Math.max.apply(null, rows.map((r) => r[1]).concat([1]));
-    return '<div class="qbars">' + rows.map((r, i) =>
-      '<button type="button" class="qbar' + (String(r[0]) === String(answer) ? ' hit' : '') + '" data-qgrp="' + e(String(r[0])) + '" data-pop="qb' + i + '">' +
-      '<span class="lab">' + e(String(r[0])) + '</span>' +
-      '<span class="bar"><i style="width:' + Math.round((r[1] / max) * 100) + '%"></i></span>' +
-      '<span class="cnt">' + r[1] + '명</span></button>').join('') + '</div>';
+    return '<div class="qbars">' + rows.map((r, i) => {
+      const who = namesOf ? namesOf(String(r[0])) : '';
+      return '<div class="qbar' + (String(r[0]) === String(answer) ? ' hit' : '') + '" data-pop="qb' + i + '">' +
+        '<span class="lab">' + e(String(r[0])) + '</span>' +
+        '<span class="bar"><i style="width:' + Math.round((r[1] / max) * 100) + '%"></i></span>' +
+        '<span class="cnt">' + r[1] + '명</span>' +
+        (who ? '<span class="who">' + who + '</span>' : '') + '</div>';
+    }).join('') + '</div>';
   }
   function drawQuiz(q) {
     const N = App.quizPlayers().length;
@@ -206,32 +209,39 @@
     const res = (V.state.quizResults || {})[z.id];
     if (!res) return { cls: 's-quiz', html: '<h1 class="s-h1">정답을 계산하고 있습니다</h1>' };
     const top = res.rows.filter((r) => r.points > 0).slice(0, 3);
-    const rank = App.quizRanking(App.QUIZZES.map((x) => (V.state.quizResults || {})[x.id]).filter(Boolean)).slice(0, 4);
+    const rank = App.quizRanking(App.QUIZZES.map((x) => (V.state.quizResults || {})[x.id]).filter(Boolean));
     const d = res.detail || {};
     let stats = '';
+    const vals = d.values || [];
     if (d.kind === 'count') {
-      stats = qBars(d.rows || [], res.answer) + '<p class="qhint">막대를 누르면 누가 냈는지 볼 수 있습니다</p><div class="qnames" id="qnames"></div>';
+      const namesOf = (g) => nameList(vals.filter((v) => String(v.value) === g).map((v) => v.id));
+      stats = qBars(d.rows || [], res.answer, namesOf) + '<p class="qhint">우리 팀의 실제 응답입니다</p>';
     } else if (d.kind === 'max' || d.kind === 'sum') {
-      const vs = (d.values || []).slice().sort((a, b) => Number(b.value) - Number(a.value));
+      const vs = vals.slice().sort((a, b) => Number(b.value) - Number(a.value));
       const mx = Math.max.apply(null, vs.map((v) => Number(v.value)).concat([1]));
       stats = '<div class="qvals">' + vs.map((v, i) =>
-        '<button type="button" class="qv' + (d.kind === 'max' && Number(v.value) === mx ? ' hit' : '') + '" data-qname="' + e(App.label(v.id)) + ' · ' + e(String(v.value)) + (d.unit || '') + '" data-pop="qv' + i + '">' +
-        '<span class="bar"><i style="width:' + Math.round((Number(v.value) / mx) * 100) + '%"></i></span><span class="num">' + e(String(v.value)) + (d.unit || '') + '</span></button>').join('') + '</div>' +
-        '<p class="qhint">막대를 누르면 누구의 값인지 볼 수 있습니다' + (d.kind === 'sum' ? ' · 모두 더하면 ' + e(res.answer) : '') + '</p><div class="qnames" id="qnames"></div>';
+        '<div class="qv' + (d.kind === 'max' && Number(v.value) === mx ? ' hit' : '') + '" data-pop="qv' + i + '">' +
+        '<span class="nm">' + e(App.label(v.id)) + '</span>' +
+        '<span class="bar"><i style="width:' + Math.round((Number(v.value) / mx) * 100) + '%"></i></span>' +
+        '<span class="num">' + e(String(v.value)) + (d.unit || '') + '</span></div>').join('') + '</div>' +
+        '<p class="qhint">우리 팀의 실제 응답입니다' + (d.kind === 'sum' ? ' · 모두 더하면 ' + e(res.answer) : '') + '</p>';
     } else {
       const cnt = {};
       (res.choices || []).forEach((c) => (cnt[c] = 0));
       res.rows.forEach((r) => { if (cnt[r.pick] != null) cnt[r.pick]++; });
-      stats = qBars(Object.keys(cnt).map((k) => [k, cnt[k]]), res.answer) + '<p class="qhint">우리가 고른 답입니다</p><div class="qnames" id="qnames"></div>';
+      stats = qBars(Object.keys(cnt).map((k) => [k, cnt[k]]), res.answer) + '<p class="qhint">우리가 고른 답입니다 (누가 골랐는지는 보여 주지 않습니다)</p>';
     }
     return {
       cls: 's-quiz reveal',
       html: '<div class="qeyebrow" data-pop>정답</div><h1 class="s-h1" data-pop>' + e(res.answer) + '</h1>' +
         '<div class="qcols"><div class="qstats">' + stats + '</div>' +
         '<div class="qscore"><div class="qsh">이번 문항</div>' +
-        (top.length ? '<ol class="qtop">' + top.map((r) => '<li><span>' + e(App.label(r.id)) + '</span><b>+' + r.points + '</b></li>').join('') + '</ol>' : '<p class="qnone">맞힌 분이 없습니다</p>') +
-        '<div class="qsh">누적 순위</div><ol class="qrank">' + rank.map((r, i) => '<li class="r' + (i + 1) + '"><span>' + e(App.label(r.id)) + '</span><b>' + r.points + '점</b></li>').join('') + '</ol></div></div>',
-      after: (el) => wireQuizNames(el, res)
+        (top.length
+          ? '<ul class="qtop">' + top.map((r, i) => '<li class="m' + (i + 1) + '" data-pop="qt' + i + '"><span class="md">' + ['🥇', '🥈', '🥉'][i] + '</span><span class="nm">' + e(App.label(r.id)) + '</span><b>+' + r.points + '</b></li>').join('') + '</ul>'
+          : '<p class="qnone">맞힌 분이 없습니다</p>') +
+        '<div class="qsh">누적 순위</div><ol class="qrank">' + rank.map((r, i) =>
+          '<li class="r' + (i + 1) + '"><span class="no">' + (i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1) + '</span><span class="nm">' + e(App.label(r.id)) + '</span><b>' + r.points + '</b></li>').join('') + '</ol></div></div>',
+      after: null
     };
   }
   function wireQuizNames(el, res) {
