@@ -686,3 +686,6 @@ body.only-quiz .tab-run { display: none; }
 body.only-quiz .h-side { display: none; }
 body.only-quiz .h-wrap { grid-template-columns: 1fr; }
 body:not(.only-quiz) .tab-quiz { display: none; }
+/* 휴대폰 제출 버튼 */
+.p .big-btn { width: 100%; margin-top: 14px; padding: 18px 12px; font-size: 20px; font-weight: 800; border: 0; border-radius: 16px; background: var(--accent); color: #fff; }
+.p .big-btn:disabled { background: #D6DCE3; color: #8A94A1; }
