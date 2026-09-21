@@ -225,10 +225,11 @@
   function quizFilled(qid) { return App.members.filter((m) => { const v = ((R(m.id) || {}).quiz || {})[qid]; return v != null && v !== ''; }).length; }
   function nameList(ids) { return ids.map((id) => e(App.label(id))).join(', '); }
   function qBars(rows, answer, namesOf) {
+    const list = (Array.isArray(answer) ? answer : [answer]).map(String);
     const max = Math.max.apply(null, rows.map((r) => r[1]).concat([1]));
     return '<div class="qbars">' + rows.map((r, i) => {
       const who = namesOf ? namesOf(String(r[0])) : '';
-      return '<div class="qbar' + (String(r[0]) === String(answer) ? ' hit' : '') + '" data-pop="qb' + i + '">' +
+      return '<div class="qbar' + (list.includes(String(r[0])) ? ' hit' : '') + '" data-pop="qb' + i + '">' +
         '<span class="lab">' + e(String(r[0])) + '</span>' +
         '<span class="bar"><i style="width:' + Math.round((r[1] / max) * 100) + '%"></i></span>' +
         '<span class="cnt">' + r[1] + '명</span>' +
@@ -269,7 +270,7 @@
     const vals = d.values || [];
     if (d.kind === 'count') {
       const namesOf = (g) => nameList(vals.filter((v) => String(v.value) === g).map((v) => v.id));
-      stats = qBars(d.rows || [], res.answer, namesOf) + '<p class="qhint">우리 팀의 실제 응답입니다</p>';
+      stats = qBars(d.rows || [], res.answers || res.answer, namesOf) + '<p class="qhint">우리 팀의 실제 응답입니다' + ((res.answers || []).length > 1 ? ' · 같은 수로 1위가 둘 이상이라 모두 정답입니다' : '') + '</p>';
     } else if (d.kind === 'max' || d.kind === 'sum') {
       const vs = vals.slice().sort((a, b) => Number(b.value) - Number(a.value));
       const mx = Math.max.apply(null, vs.map((v) => Number(v.value)).concat([1]));
@@ -283,7 +284,7 @@
       const cnt = {};
       (res.choices || []).forEach((c) => (cnt[c] = 0));
       res.rows.forEach((r) => { if (cnt[r.pick] != null) cnt[r.pick]++; });
-      stats = qBars(Object.keys(cnt).map((k) => [k, cnt[k]]), res.answer) + '<p class="qhint">우리가 고른 답입니다 (누가 골랐는지는 보여 주지 않습니다)</p>';
+      stats = qBars(Object.keys(cnt).map((k) => [k, cnt[k]]), res.answers || res.answer) + '<p class="qhint">우리가 고른 답입니다 (누가 골랐는지는 보여 주지 않습니다)</p>';
     }
     return {
       cls: 's-quiz reveal',
