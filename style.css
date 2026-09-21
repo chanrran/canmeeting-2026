@@ -521,3 +521,76 @@ body.p { background: linear-gradient(180deg, #EEF6F8 0%, #FAFBFC 240px); }
 /* 오른쪽 아래 큰 QR과 겹치지 않게 3번째 칸 아래를 비움 */
 .s-manual .rb3 .c3 { padding-bottom: 176px; }
 .s-emo .foot { padding-right: 200px; }
+
+/* ---------------- 팝업 퀴즈 (큰 화면) ---------------- */
+.s-quiz { align-items: flex-start; justify-content: center; gap: 22px; }
+.s-quiz .qeyebrow { font-size: 30px; font-weight: 800; letter-spacing: .14em; color: var(--s-gold); }
+.s-quiz .s-h1 { font-size: 86px; line-height: 1.15; word-break: keep-all; }
+.s-quiz.input { align-items: center; text-align: center; justify-content: center; }
+.s-quiz .qcount { font-size: 44px; color: var(--s-mute); margin-top: 20px; }
+.s-quiz .qcount em { font-style: normal; font-size: 72px; font-weight: 900; color: var(--s-good); }
+.s-quiz .qchoices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; width: 100%; max-width: 1500px; margin-top: 10px; }
+.s-quiz .qc { background: #fff; color: #1A2233; border-radius: 20px; padding: 30px 36px; font-size: 48px; font-weight: 800; display: flex; align-items: center; gap: 24px; }
+.s-quiz .qc b { width: 56px; height: 56px; border-radius: 50%; background: #1A2233; color: #fff; font-size: 28px; display: flex; align-items: center; justify-content: center; flex: none; }
+.s-quiz .qtimer { position: absolute; right: 230px; bottom: 60px; text-align: right; }
+.s-quiz .clock { font-size: 150px; font-weight: 900; line-height: 1; color: var(--s-good); }
+.s-quiz .clock.hot { color: var(--s-bad); }
+.s-quiz .qsub { font-size: 28px; color: var(--s-mute); }
+.s-quiz .qsub em { font-style: normal; color: var(--s-ink); font-weight: 800; }
+.s-quiz.reveal .s-h1 { color: var(--s-good); font-size: 96px; }
+.s-quiz .qcols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 48px; width: 100%; flex: 1; min-height: 0; }
+.qbars { display: flex; flex-direction: column; gap: 12px; }
+.qbar { display: grid; grid-template-columns: 180px 1fr 110px; align-items: center; gap: 18px; background: transparent; border: 0; color: var(--s-ink); font-size: 30px; text-align: left; cursor: pointer; padding: 4px 0; }
+.qbar .bar { height: 26px; background: rgba(255,255,255,.08); border-radius: 13px; overflow: hidden; }
+.qbar .bar i { display: block; height: 100%; background: var(--s-accent); border-radius: 13px; }
+.qbar.hit .lab, .qbar.hit .cnt { color: var(--s-good); font-weight: 900; }
+.qbar.hit .bar i { background: var(--s-good); }
+.qvals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 26px; }
+.qv { display: grid; grid-template-columns: 1fr 150px; align-items: center; gap: 14px; background: transparent; border: 0; color: var(--s-ink); font-size: 28px; cursor: pointer; }
+.qv .bar { height: 20px; background: rgba(255,255,255,.08); border-radius: 10px; overflow: hidden; }
+.qv .bar i { display: block; height: 100%; background: var(--s-accent); }
+.qv.hit .bar i { background: var(--s-gold); }
+.qv .num { text-align: right; font-weight: 800; }
+.qhint { font-size: 24px; color: var(--s-mute); margin-top: 14px; }
+.qnames { font-size: 30px; margin-top: 8px; min-height: 44px; color: var(--s-ink); }
+.qscore { background: rgba(255,255,255,.05); border-radius: 20px; padding: 28px 32px; }
+.qsh { font-size: 26px; font-weight: 800; color: var(--s-mute); letter-spacing: .06em; margin: 6px 0 12px; }
+.qtop { list-style: none; padding: 0; margin: 0 0 18px; }
+.qtop li { display: flex; justify-content: space-between; font-size: 34px; padding: 8px 0; }
+.qtop li b { color: var(--s-gold); }
+.qnone { font-size: 28px; color: var(--s-mute); }
+.qrank { list-style: none; padding: 0; margin: 0; counter-reset: qr; }
+.qrank li { display: flex; justify-content: space-between; font-size: 30px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+.qrank li.r1 { color: var(--s-gold); font-weight: 900; }
+.s-quiz.final { align-items: center; text-align: center; }
+.qpodium { display: flex; gap: 40px; align-items: flex-end; margin-top: 30px; }
+.qpodium .pod { background: #fff; color: #1A2233; border-radius: 24px; padding: 34px 48px; }
+.qpodium .p1 { padding-bottom: 70px; }
+.qpodium .m { font-size: 62px; }
+.qpodium .nm { font-size: 42px; font-weight: 900; margin-top: 8px; }
+.qpodium .pt { font-size: 32px; color: #4A5568; }
+.qrest { list-style: none; padding: 0; margin: 28px 0 0; display: flex; gap: 26px; font-size: 26px; color: var(--s-mute); flex-wrap: wrap; justify-content: center; }
+
+/* ---------------- 팝업 퀴즈 (휴대폰) ---------------- */
+.p .qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+.p .qopt { padding: 18px 12px; font-size: 20px; font-weight: 800; border: 2px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); }
+.p .qopt.on { border-color: var(--accent); background: var(--accent); color: #fff; }
+.p .qopt:disabled { opacity: .55; }
+.p .qtop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.p .qtop .pts { font-size: 15px; font-weight: 800; color: var(--accent); }
+.p .qtop .left { font-size: 16px; color: var(--ink2); }
+.p .qtop .left b { font-size: 30px; color: var(--ink); }
+.p .stepbox { display: grid; grid-template-columns: 74px 1fr 74px; align-items: center; gap: 12px; margin: 12px 0; }
+.p .stepbtn { height: 74px; border-radius: 18px; border: 2px solid var(--line); background: #fff; font-size: 34px; font-weight: 800; color: var(--ink); }
+.p .stepval { text-align: center; font-size: 46px; font-weight: 900; }
+.p .bigin { width: 100%; font-size: 40px; font-weight: 800; text-align: center; letter-spacing: .1em; padding: 16px; border: 2px solid var(--line); border-radius: 16px; margin: 12px 0; }
+.p .info-card.ok { border-color: var(--good); }
+
+/* 마무리 한마디 */
+.s-word { align-items: center; justify-content: center; text-align: center; gap: 10px; }
+.s-word .eyebrow { font-size: 32px; font-weight: 800; letter-spacing: .06em; color: var(--s-accent); }
+.s-word .who { font-size: 120px; font-weight: 900; line-height: 1.1; margin: 10px 0 20px; }
+.s-word .clock { font-size: 190px; font-weight: 900; line-height: 1; color: var(--s-good); }
+.s-word .clock.hot { color: var(--s-bad); }
+.s-word .csub { font-size: 30px; color: var(--s-mute); }
+.s-word .nextone { font-size: 30px; color: var(--s-mute); margin-top: 26px; }
