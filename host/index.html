@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <title>진행자 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="../style.css?v=20260921i">
+<link rel="stylesheet" href="../style.css?v=20260922a">
 </head>
 <body class="h">
 <div id="root"></div>
@@ -14,8 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="../config.js?v=20260921i"></script>
-<script src="../app.js?v=20260921i"></script>
+<script src="../config.js?v=20260922a"></script>
+<script src="../app.js?v=20260922a"></script>
 <script>
 (function () {
   'use strict';
@@ -65,7 +65,7 @@
     App.db.watchDoc('session/state', (d) => {
       if (!d) { App.db.replace('session/state', App.defaultState()); return; }
       H.state = App.withDefaults(d);
-      renderSide(); renderCtx(); renderAssign(); renderStatus(); fillClosingOnce();
+      renderSide(); renderCtx(); renderAssign(); renderStatus(); renderQuiz(); fillClosingOnce();
     });
     App.db.watchCol('responses', (list) => { H.respLoaded = true; H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); renderQuiz(); });
     App.db.watchCol('praises', (list) => { H.praisesLoaded = true; H.praises = list; renderStatus(); renderCtx(); renderAssign(); });
@@ -298,7 +298,7 @@
     if (!H.state || !$('quiz')) return;
     const st = H.state, q = st.quiz || {}, N = App.quizPlayers().length;
     const results = st.quizResults || {};
-    let h = '<h2>팝업 퀴즈</h2><p class="desc">① 입력 받기 → ② 정답 미리 보기(팀장님만) → ③ 문제 내기(' + App.QUIZ_SECONDS + '초) → ④ 정답·점수 공개</p>';
+    let h = '<h2>팝업 퀴즈</h2><p class="desc">① 입력 받기 → ② 배점 룰렛 → 룰렛 멈추기 → ③ 정답 미리 보기(팀장님만) → ④ 문제 내기(' + App.QUIZ_SECONDS + '초) → ⑤ 정답·점수 공개</p>';
     h += '<div class="quizrows">';
     App.QUIZZES.forEach((z, i) => {
       const ins = quizInputs(z.id).length, picks = quizPicks(z.id).length;
@@ -306,12 +306,17 @@
       const on = q.id === z.id ? q.phase : '';
       h += '<div class="quizrow' + (on ? ' on' : '') + '">' +
         '<div class="qn">' + (i + 1) + '</div>' +
-        '<div class="qt"><b>' + e(z.question) + '</b><span>입력 ' + ins + '/' + N + ' · 답 ' + picks + '/' + N + (done ? ' · 공개 완료' : on ? ' · 진행 중(' + e(on) + ')' : '') + '</span></div>' +
+        '<div class="qt"><b>' + e(z.question) + '</b><span>입력 ' + ins + '/' + N + ' · 답 ' + picks + '/' + N +
+          ' · 배점 ' + (q.id === z.id && q.points && q.points.length ? e(q.points.join('/')) + '점' : (results[z.id] && results[z.id].points ? e(results[z.id].points.join('/')) + '점' : '룰렛 전')) +
+          (done ? ' · 공개 완료' : on ? ' · 진행 중(' + e(on) + ')' : '') + '</span></div>' +
         '<div class="qb">' +
         '<button type="button" class="hb" data-qz="input" data-id="' + z.id + '">① 입력</button>' +
-        '<button type="button" class="hb" data-qz="peek" data-id="' + z.id + '"' + (ins ? '' : ' disabled') + '>② 미리 보기</button>' +
-        '<button type="button" class="hb solid" data-qz="ask" data-id="' + z.id + '"' + (ins ? '' : ' disabled') + '>③ 문제</button>' +
-        '<button type="button" class="hb" data-qz="reveal" data-id="' + z.id + '"' + (on === 'question' || on === 'reveal' ? '' : ' disabled') + '>④ 공개</button>' +
+        (on === 'wheel' && !(q.points && q.points.length)
+          ? '<button type="button" class="hb gold" data-qz="stop" data-id="' + z.id + '">룰렛 멈추기</button>'
+          : '<button type="button" class="hb" data-qz="wheel" data-id="' + z.id + '">② 배점 룰렛</button>') +
+        '<button type="button" class="hb" data-qz="peek" data-id="' + z.id + '"' + (ins ? '' : ' disabled') + '>③ 미리 보기</button>' +
+        '<button type="button" class="hb solid" data-qz="ask" data-id="' + z.id + '"' + (ins ? '' : ' disabled') + '>④ 문제</button>' +
+        '<button type="button" class="hb" data-qz="reveal" data-id="' + z.id + '"' + (on === 'question' || on === 'reveal' ? '' : ' disabled') + '>⑤ 공개</button>' +
         '</div></div>';
       if (previewShown === z.id && H.secret && H.secret.id === z.id)
         h += '<div class="peek">정답: <b>' + e(H.secret.answer) + '</b>' + ((H.secret.answers || []).length > 1 ? ' (동률 · 모두 정답)' : '') + ' · 보기: ' + e((H.secret.choices || []).join(' / ')) + ' <button type="button" class="linkbtn" data-qz="hide">숨기기</button></div>';
@@ -338,7 +343,16 @@
       return;
     }
     if (!z) return;
-    if (act === 'input') { await App.db.set('session/state', { quiz: { id: id, phase: 'input', startedAt: 0, choices: [] } }); return; }
+    if (act === 'input') { await App.db.set('session/state', { quiz: { id: id, phase: 'input', startedAt: 0, choices: [], points: null, stopAt: 0, stopIdx: 0 } }); return; }
+    if (act === 'wheel') {
+      await App.db.set('session/state', { quiz: { id: id, phase: 'wheel', startedAt: App.now(), choices: [], points: null, stopAt: 0, stopIdx: 0 } });
+      return;
+    }
+    if (act === 'stop') {
+      const idx = Math.floor(Math.random() * App.POINT_TABLE.length);
+      await App.db.set('session/state', { quiz: { id: id, phase: 'wheel', startedAt: (H.state.quiz || {}).startedAt || App.now(), choices: [], stopAt: App.now(), stopIdx: idx, points: App.POINT_TABLE[idx] } });
+      return;
+    }
     if (act === 'peek' || act === 'ask') {
       let made = H.secret && H.secret.id === id ? H.secret : null;
       if (!made) {
@@ -347,14 +361,16 @@
       }
       if (act === 'peek') { previewShown = id; renderQuiz(); return; }
       previewShown = null;
-      await App.db.set('session/state', { quiz: { id: id, phase: 'question', startedAt: App.now(), choices: made.choices } });
+      const pts = (H.state.quiz && H.state.quiz.id === id && H.state.quiz.points) || z.points;
+      await App.db.set('session/state', { quiz: { id: id, phase: 'question', startedAt: App.now(), choices: made.choices, points: pts, stopAt: 0, stopIdx: 0 } });
       return;
     }
     if (act === 'reveal') {
       const made = H.secret && H.secret.id === id ? H.secret : Object.assign({ id: id }, App.makeQuiz(z, quizInputs(id)));
-      const rows = App.scoreQuiz(z, made.answers || [made.answer], quizPicks(id));
-      const res = {}; res[id] = { answer: made.answer, answers: made.answers || [made.answer], choices: made.choices, detail: made.detail || null, rows: rows, at: App.now() };
-      await App.db.set('session/state', { quizResults: res, quiz: { id: id, phase: 'reveal', startedAt: App.now(), choices: made.choices } });
+      const pts = (H.state.quiz && H.state.quiz.id === id && H.state.quiz.points) || z.points;
+      const rows = App.scoreQuiz({ points: pts }, made.answers || [made.answer], quizPicks(id));
+      const res = {}; res[id] = { answer: made.answer, answers: made.answers || [made.answer], choices: made.choices, detail: made.detail || null, rows: rows, points: pts, at: App.now() };
+      await App.db.set('session/state', { quizResults: res, quiz: { id: id, phase: 'reveal', startedAt: App.now(), choices: made.choices, points: pts } });
     }
   }
 
