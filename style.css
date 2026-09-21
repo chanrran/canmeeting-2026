@@ -694,3 +694,18 @@ body:not(.only-quiz) .tab-quiz { display: none; }
 .p .big-btn:disabled { box-shadow: none; }
 .p .p-main { padding-bottom: 24px; }
 .p .qtop .pts { font-size: 13px; }
+
+.s-quiz.reveal .qsub2 { font-size: 24px; font-weight: 800; color: var(--s-accent); margin: 16px 0 8px; }
+.s-quiz.reveal .qstats > .qsub2:first-child { margin-top: 0; }
+.s-quiz.reveal .qbar { font-size: 27px; }
+.s-quiz.reveal .qbar .who { font-size: 20px; }
+.s-quiz.reveal .qv { font-size: 22px; }
+
+/* 배점 룰렛 */
+.s-quiz.wheel { align-items: center; justify-content: center; text-align: center; gap: 18px; }
+.wheelbox { width: 560px; height: 560px; }
+.wheelsvg { width: 100%; height: 100%; filter: drop-shadow(0 20px 40px rgba(0,0,0,.45)); }
+.wheelout { font-size: 40px; font-weight: 700; color: var(--s-mute); min-height: 60px; }
+.wheelout.done { color: var(--s-gold); font-size: 54px; font-weight: 900; }
+
+.hb.gold { background: #FFD166; border-color: #E0B44F; color: #5A4100; font-weight: 900; }
