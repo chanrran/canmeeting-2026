@@ -205,10 +205,31 @@
     const ready = (async () => {
       if (!window.firebase || !firebase.firestore) { const e = new Error('Firebase 라이브러리 없음'); e.code = 'nolib'; throw e; }
       firebase.initializeApp(C.FIREBASE);
-      await firebase.auth().signInAnonymously();
+      const cred = await firebase.auth().signInAnonymously();
+      /* 로그인 표가 실제로 준비될 때까지 한 번 더 기다림 (휴대폰에서 첫 연결이 '권한 없음'으로 끊기는 것 방지) */
+      if (cred && cred.user && cred.user.getIdToken) await cred.user.getIdToken();
       fs = firebase.firestore();
     })();
     const wrap = (p) => p.catch((e) => { App.showError(App.koreanError(e)); throw e; });
+    /* 실시간 구독: 오류가 나면 다시 로그인하고 최대 3번까지 다시 연결해 본다 */
+    let stop = null;
+    function watch(make, cb) {
+      let tries = 0, got = false, off = null;
+      const start = () => {
+        off = make(
+          (data) => { got = true; tries = 0; App.clearError(); cb(data); },
+          async (e) => {
+            if (off) { try { off(); } catch (err) {} off = null; }
+            tries++;
+            if (tries > 3) { App.showError(App.koreanError(e)); return; }
+            try { if (!firebase.auth().currentUser) await firebase.auth().signInAnonymously(); } catch (err) {}
+            setTimeout(start, 1200 * tries);
+          }
+        );
+      };
+      start();
+      return () => { if (off) off(); };
+    }
     return {
       ready,
       get: (p) => wrap(fs.doc(p).get().then((s) => (s.exists ? s.data() : null))),
@@ -220,10 +241,9 @@
       delCol: (col) => wrap(fs.collection(col).get().then((q) => {
         const batch = fs.batch(); q.docs.forEach((d) => batch.delete(d.ref)); return batch.commit();
       })),
-      watchDoc: (p, cb) => fs.doc(p).onSnapshot((s) => cb(s.exists ? s.data() : null), (e) => App.showError(App.koreanError(e))),
-      watchCol: (col, cb) => fs.collection(col).onSnapshot(
-        (q) => cb(q.docs.map((d) => Object.assign({ id: d.id }, d.data()))),
-        (e) => App.showError(App.koreanError(e)))
+      /* 연결이 한 번 끊겨도 바로 오류 띠를 띄우지 않고, 로그인을 새로 받아 세 번까지 다시 연결 */
+      watchDoc: (p, cb) => watch((ok, err) => fs.doc(p).onSnapshot((s) => ok(s.exists ? s.data() : null), err), cb),
+      watchCol: (col, cb) => watch((ok, err) => fs.collection(col).onSnapshot((q) => ok(q.docs.map((d) => Object.assign({ id: d.id }, d.data()))), err), cb)
     };
   }
 
