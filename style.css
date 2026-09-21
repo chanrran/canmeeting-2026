@@ -657,3 +657,4 @@ body.p { background: linear-gradient(180deg, #EEF6F8 0%, #FAFBFC 240px); }
 .s-quiz.reveal .qrank li { font-size: 21px; padding: 4px 6px; }
 .s-quiz.reveal .qsh { font-size: 22px; }
 .s-quiz .qtimer { right: 96px; }
+.s-quiz .qnote { font-size: 34px; font-weight: 700; color: var(--s-gold); margin: 6px 0 0; }
