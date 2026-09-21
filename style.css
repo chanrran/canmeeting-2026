@@ -648,3 +648,12 @@ body.p { background: linear-gradient(180deg, #EEF6F8 0%, #FAFBFC 240px); }
 .s-quiz.reveal .s-h1 { font-size: 74px; margin: 0; }
 .s-quiz.reveal .qeyebrow { font-size: 26px; }
 .s-quiz.reveal .qrank li { font-size: 18px; padding: 1px 6px; }
+
+/* 퀴즈 화면에서는 QR을 왼쪽 아래로 */
+.s-corner.left { right: auto; left: 32px; }
+/* QR이 비켜 주므로 점수판을 아래까지 시원하게 */
+.s-quiz.reveal .qscore { max-height: 100%; margin-bottom: 0; padding: 22px 20px 18px; }
+.s-quiz.reveal .qtop li { font-size: 24px; padding: 8px 12px; }
+.s-quiz.reveal .qrank li { font-size: 21px; padding: 4px 6px; }
+.s-quiz.reveal .qsh { font-size: 22px; }
+.s-quiz .qtimer { right: 96px; }
