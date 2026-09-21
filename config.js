@@ -93,7 +93,7 @@ window.CONFIG = {
     },
     {
       id: "career",
-      inputTitle: "여러분의 근무 경력을 햇수로 골라 주세요 (반올림)",
+      inputTitle: "여러분의 경력 년수를 입력해주세요",
       input: { kind: "step", min: 0, max: 45, step: 1, unit: "년", start: 10 },
       question: "우리 팀의 근무 경력을 모두 더하면 몇 년일까요?",
       answer: { kind: "sum", gap: 1, unit: "년" },
