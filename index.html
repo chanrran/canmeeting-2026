@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAFBFC">
 <title>우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260921i">
+<link rel="stylesheet" href="style.css?v=20260922a">
 </head>
 <body class="p">
 <div class="p-shell">
@@ -19,8 +19,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20260921i"></script>
-<script src="app.js?v=20260921i"></script>
+<script src="config.js?v=20260922a"></script>
+<script src="app.js?v=20260922a"></script>
 <script>
 (function () {
   'use strict';
@@ -191,6 +191,10 @@
     }
     const z = App.quizById(q.id);
     if (!z) return info('quiz-wait', '지금은', '팝업 퀴즈', '큰 화면을 봐 주세요');
+    if (q.phase === 'wheel') {
+      const pts = q.points && q.points.length ? App.pointsText(z, q) : null;
+      return info('quiz-wheel-' + q.id + '-' + (pts || ''), '이번 문제의 배점', pts || '룰렛을 돌리는 중입니다', pts ? '곧 문제가 나옵니다' : '큰 화면을 봐 주세요');
+    }
     if (q.phase === 'input') return { key: 'quiz-in-' + q.id + '-' + (myQuiz(q.id) || '') + '-' + (S.sub.qedit || ''), draw: (el) => drawQuizInput(el, z) };
     if (q.phase === 'question') return { key: 'quiz-q-' + q.id + '-' + q.startedAt + '-' + (myPick(q.id) || ''), draw: (el) => drawQuizAsk(el, z, q) };
     return { key: 'quiz-r-' + q.id, draw: (el) => drawQuizResult(el, z) };
@@ -253,7 +257,7 @@
   function drawQuizAsk(el, z, q) {
     const picked = myPick(z.id);
     const left = () => Math.max(0, App.QUIZ_SECONDS - Math.floor((Date.now() - (q.startedAt || 0)) / 1000));
-    const pts = App.pointsText(z);
+    const pts = App.pointsText(z, q);
     if (!App.isQuizPlayer(S.me)) {
       el.innerHTML = '<h1>' + e(z.question) + '</h1><div class="info-card"><div class="s1">진행자</div><div class="big">문제를 내는 분은 참여하지 않습니다</div><div class="s2">큰 화면을 봐 주세요</div></div>';
       return;
