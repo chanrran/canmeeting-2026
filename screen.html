@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260921c">
+<link rel="stylesheet" href="style.css?v=20260921d">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -16,9 +16,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260921c"></script>
-<script src="config.js?v=20260921c"></script>
-<script src="app.js?v=20260921c"></script>
+<script src="qrcode.js?v=20260921d"></script>
+<script src="config.js?v=20260921d"></script>
+<script src="app.js?v=20260921d"></script>
 <script>
 (function () {
   'use strict';
@@ -194,6 +194,7 @@
       return {
         cls: 's-quiz input',
         html: '<div class="qeyebrow" data-pop>POP QUIZ</div><h1 class="s-h1" data-pop>' + e(z.inputTitle) + '</h1>' +
+          (z.inputNote ? '<p class="qnote" data-pop>' + e(z.inputNote) + '</p>' : '') +
           '<p class="s-lead" data-pop>휴대폰에서 입력해 주세요. 무엇에 쓰는지는 곧 알려 드립니다</p>' +
           '<div class="qcount" data-pop><em>' + quizFilled(z.id) + '</em> / ' + App.members.length + ' 입력</div>'
       };
