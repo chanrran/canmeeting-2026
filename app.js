@@ -460,7 +460,11 @@
     let answer = 0;
     if (A.kind === 'max') answer = nums.length ? Math.max.apply(null, nums) : 0;
     if (A.kind === 'sum') answer = nums.reduce((a, b) => a + b, 0);
-    const near = App.shuffle([-2, -1, 1, 2, 3]).slice(0, 3).map((k) => answer + k * gap).filter((v) => v !== answer && v >= 0);
+    /* offsets가 있으면 그 차이로 보기를 만든다 (예: 발 사이즈는 +5, +10, -5) */
+    const near = (A.offsets && A.offsets.length
+      ? A.offsets.map((d) => answer + d)
+      : App.shuffle([-2, -1, 1, 2, 3]).slice(0, 3).map((k) => answer + k * gap)
+    ).filter((v) => v !== answer && v >= 0);
     while (near.length < 3) near.push(answer + (near.length + 3) * gap);
     const unit = A.unit || '';
     return {
