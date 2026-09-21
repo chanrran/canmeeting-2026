@@ -110,6 +110,8 @@
     /* 오른쪽 아래 QR: 접속 안내 화면(가운데에 큰 QR이 있음)을 뺀 모든 화면 */
     const corner = st === 'lobby' && !brk && !qz ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>';
     if (corner !== V.lastCorner) { V.lastCorner = corner; $corner.innerHTML = corner; }
+    /* 점수판이 오른쪽을 쓰는 화면에서는 QR을 왼쪽 아래로 옮김 */
+    $corner.className = 's-corner' + (qz && (qz.phase === 'reveal' || qz.phase === 'question') ? ' left' : '');
   }
 
   let N = App.members.length;
