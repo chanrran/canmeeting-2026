@@ -433,25 +433,29 @@
     const values = list.map((r) => ({ id: r.memberId, value: r.value }));
     const A = q.answer || {};
     if (A.kind === 'fixed') {
-      return { choices: A.choices.slice(), answer: A.value, detail: { kind: 'fixed', values: values } };
+      return { choices: A.choices.slice(), answer: A.value, answers: [A.value], detail: { kind: 'fixed', values: values } };
     }
     if (A.kind === 'mode') {
       const opts = (q.input.options || []).slice();
       const count = {};
       opts.forEach((o) => (count[o] = 0));
       vals.forEach((v) => { count[v] = (count[v] || 0) + 1; });
-      let answer = opts[0];
-      opts.forEach((o) => { if (count[o] > count[answer]) answer = o; });
+      let top = 0;
+      opts.forEach((o) => { if (count[o] > top) top = count[o]; });
+      /* 같은 수로 1위가 여럿이면 그 값이 모두 정답 */
+      const answers = opts.filter((o) => count[o] === top && top > 0);
+      if (!answers.length) answers.push(opts[0]);
       let choices = opts;
       if (A.choiceCount && opts.length > A.choiceCount) {
-        /* 정답과 다른 보기 3개 (실제로 나온 띠를 먼저, 모자라면 나머지에서) */
-        const others = App.shuffle(opts.filter((o) => o !== answer && count[o] > 0))
-          .concat(App.shuffle(opts.filter((o) => o !== answer && !count[o])));
-        choices = App.shuffle([answer].concat(others.slice(0, A.choiceCount - 1)));
+        const keep = answers.slice(0, A.choiceCount);
+        const others = App.shuffle(opts.filter((o) => !keep.includes(o) && count[o] > 0))
+          .concat(App.shuffle(opts.filter((o) => !keep.includes(o) && !count[o])));
+        choices = App.shuffle(keep.concat(others.slice(0, Math.max(0, A.choiceCount - keep.length))));
       }
       return {
         choices: choices,
-        answer: answer,
+        answer: answers.join(' · '),
+        answers: answers,
         detail: { kind: 'count', rows: opts.filter((o) => count[o] > 0).map((o) => [o, count[o]]), values: values }
       };
     }
@@ -470,15 +474,17 @@
     return {
       choices: App.shuffle([answer].concat(near.slice(0, 3))).map((v) => String(v) + unit),
       answer: String(answer) + unit,
+      answers: [String(answer) + unit],
       detail: { kind: A.kind, unit: unit, values: values }
     };
   };
 
   /* 맞힌 분들 중 빠른 순서대로 점수를 준다 */
-  App.scoreQuiz = (q, answer, picks) => {
+  App.scoreQuiz = (q, answers, picks) => {
+    const list = (Array.isArray(answers) ? answers : [answers]).map(String);
     const rows = (picks || [])
       .filter((p) => App.isQuizPlayer(p.memberId))
-      .map((p) => ({ id: p.memberId, pick: p.pick, ms: p.ms, ok: String(p.pick) === String(answer), points: 0 }));
+      .map((p) => ({ id: p.memberId, pick: p.pick, ms: p.ms, ok: list.includes(String(p.pick)), points: 0 }));
     rows.filter((r) => r.ok).sort((a, b) => a.ms - b.ms).forEach((r, i) => { r.points = (q.points || [])[i] || 0; });
     return rows.sort((a, b) => b.points - a.points || a.ms - b.ms);
   };
