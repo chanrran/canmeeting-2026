@@ -709,3 +709,15 @@ body:not(.only-quiz) .tab-quiz { display: none; }
 .wheelout.done { color: var(--s-gold); font-size: 54px; font-weight: 900; }
 
 .hb.gold { background: #FFD166; border-color: #E0B44F; color: #5A4100; font-weight: 900; }
+
+/* QR은 언제나 오른쪽 맨 위 */
+.s-corner { top: 26px; right: 32px; bottom: auto; left: auto; }
+.s-corner.left { left: auto; right: 32px; }
+
+/* QR(오른쪽 맨 위 200×200)과 절대 겹치지 않도록 화면별 여백 */
+.s-emo .head { padding-right: 220px; }                 /* 발표자 이름과 n/12 */
+.s-emo .chart { padding-right: 210px; }                /* 곡선 그래프 */
+.s-praise .cards { padding-top: 40px; padding-right: 210px; }
+.s-manual .rb3 { margin-right: 212px; }                /* 설명서 카드가 QR 왼쪽에서 끝나게 */
+.s-team .body { padding-right: 0; }
+.s-emo .chart svg { max-width: 100%; height: auto; }
