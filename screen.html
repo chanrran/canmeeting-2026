@@ -5,20 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260921d">
+<link rel="stylesheet" href="style.css?v=20260921e">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
   <div class="s-stage" id="stage"></div>
   <div class="s-corner" id="corner"></div>
+  <button type="button" class="sfx-btn" id="sfx" aria-label="효과음 켜기">🔇 소리 켜기</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260921d"></script>
-<script src="config.js?v=20260921d"></script>
-<script src="app.js?v=20260921d"></script>
+<script src="qrcode.js?v=20260921e"></script>
+<script src="config.js?v=20260921e"></script>
+<script src="app.js?v=20260921e"></script>
 <script>
 (function () {
   'use strict';
@@ -76,6 +77,40 @@
     if (ev.key === 'ArrowLeft' && cur > 0) App.db.set('session/state', { teamSlide: cur - 1 });
   });
 
+  /* ---------------- 효과음 ---------------- */
+  const SFX = (() => {
+    let ctx = null, on = App.ls.get('canmeeting_sfx', false);
+    const btn = document.getElementById('sfx');
+    const paint = () => { btn.textContent = on ? '🔊 소리 켬' : '🔇 소리 켜기'; btn.classList.toggle('on', on); };
+    const ensure = () => { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); return ctx; };
+    btn.onclick = () => { on = !on; App.ls.set('canmeeting_sfx', on); paint(); if (on) { ensure(); tone([880], 0.12, 'sine', 0.25); } };
+    paint();
+    /* 음 하나 */
+    function note(freq, start, dur, type, vol) {
+      const c = ensure();
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || 'sine'; o.frequency.setValueAtTime(freq, c.currentTime + start);
+      g.gain.setValueAtTime(0.0001, c.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(vol || 0.3, c.currentTime + start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + start + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05);
+    }
+    function tone(freqs, dur, type, vol, gap) {
+      if (!on) return;
+      try { freqs.forEach((f, i) => note(f, i * (gap == null ? dur * 0.8 : gap), dur, type, vol)); } catch (e) {}
+    }
+    return {
+      reveal: () => tone([523.25, 659.25, 783.99, 1046.5], 0.22, 'triangle', 0.28, 0.12),   /* 이름 공개 */
+      quizStart: () => tone([659.25, 880], 0.16, 'square', 0.16, 0.12),                      /* 문제 시작 */
+      answer: () => tone([523.25, 783.99, 1046.5, 1318.5], 0.3, 'triangle', 0.3, 0.14),      /* 정답 공개 */
+      fanfare: () => tone([523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98], 0.34, 'sawtooth', 0.2, 0.16),
+      chime: () => tone([987.77, 1318.5], 0.3, 'sine', 0.22, 0.1),                            /* 칭찬·한마디 */
+      tick: () => tone([1200], 0.06, 'square', 0.12),
+      timeup: () => tone([392, 311.13], 0.5, 'sine', 0.25, 0.22)
+    };
+  })();
+
   /* ---------------- 그리기 ---------------- */
   function render() {
     if (!V.state) return;
@@ -106,6 +141,7 @@
       if (out.after) out.after(el);
       enhance(el);
     }
+    if (newView) playSfx(vk, qz, st);
     V.lastVk = vk;
     /* 오른쪽 아래 QR: 접속 안내 화면(가운데에 큰 QR이 있음)을 뺀 모든 화면 */
     const corner = st === 'lobby' && !brk && !qz ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>';
@@ -159,6 +195,21 @@
       case 'farewell': return drawFarewell();
     }
     return { cls: '', html: '' };
+  }
+
+  /* 화면이 바뀌는 순간에 맞춰 효과음 */
+  function playSfx(vk, qz, st) {
+    if (V.lastVk == null) return;   /* 첫 화면에서는 소리 없음 */
+    if (qz) {
+      if (qz.phase === 'question') SFX.quizStart();
+      else if (qz.phase === 'reveal') SFX.answer();
+      else if (qz.phase === 'final') SFX.fanfare();
+      return;
+    }
+    if (st === 'manual_person' && V.state.manualRevealed) { SFX.reveal(); return; }
+    if (st === 'praise' && V.state.praiseTarget) { SFX.chime(); return; }
+    if (st === 'farewell' && V.state.closingCurrent) { SFX.chime(); return; }
+    if (st === 'closing') { SFX.chime(); return; }
   }
 
   function fmtDate(d) {
