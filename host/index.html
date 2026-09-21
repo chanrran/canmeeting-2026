@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <title>진행자 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="../style.css?v=20260921e">
+<link rel="stylesheet" href="../style.css?v=20260921f">
 </head>
 <body class="h">
 <div id="root"></div>
@@ -14,8 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="../config.js?v=20260921e"></script>
-<script src="../app.js?v=20260921e"></script>
+<script src="../config.js?v=20260921f"></script>
+<script src="../app.js?v=20260921f"></script>
 <script>
 (function () {
   'use strict';
@@ -35,18 +35,29 @@
     '<header class="h-top"><h1>진행자 화면</h1><span class="mode ' + (App.mode === 'demo' ? 'demo' : '') + '">' +
       (App.mode === 'demo' ? '데모 모드 · 이 브라우저에서만 저장' : 'Firebase 연결') + '</span><span class="sp"></span>' +
       '<a href="../screen.html" target="_blank" rel="noopener">큰 화면 열기 ↗</a>' +
-      '<a href="../" target="_blank" rel="noopener">참가자 화면 열기 ↗</a></header>' +
+      '<a href="../" target="_blank" rel="noopener">참가자 화면 열기 ↗</a>' +
+      '<a href="?key=' + encodeURIComponent(CONFIG.ADMIN_KEY) + '&tab=quiz" target="_blank" rel="noopener" class="quizlink">팝업 퀴즈 창 열기 ↗</a></header>' +
+    '<nav class="h-tabs" id="tabs"><button type="button" class="tab on" data-tab="run">워크숍 진행</button><button type="button" class="tab" data-tab="quiz">팝업 퀴즈</button></nav>' +
     '<div class="h-wrap"><aside class="h-side" id="side"></aside><main class="h-main">' +
-      '<section class="panel now" id="ctx"></section>' +
-      '<section class="panel" id="quiz"></section>' +
-      '<section class="panel"><h2>제출 현황</h2><div class="status-wrap" id="status"></div></section>' +
-      '<section class="panel" id="assign"></section>' +
-      '<section class="panel" id="prompt"></section>' +
-      '<section class="panel" id="members"></section>' +
-      '<section class="panel" id="data"></section>' +
+      '<section class="panel quizpanel tab-quiz" id="quiz"></section>' +
+      '<section class="panel now tab-run" id="ctx"></section>' +
+      '<section class="panel tab-run"><h2>제출 현황</h2><div class="status-wrap" id="status"></div></section>' +
+      '<section class="panel tab-run" id="assign"></section>' +
+      '<section class="panel tab-run" id="prompt"></section>' +
+      '<section class="panel tab-run" id="members"></section>' +
+      '<section class="panel tab-run" id="data"></section>' +
     '</main></div>';
 
   const $ = (id) => document.getElementById(id);
+
+  /* ---------------- 화면 나누기: 워크숍 진행 / 팝업 퀴즈 ---------------- */
+  function setTab(t) {
+    document.body.classList.toggle('only-quiz', t === 'quiz');
+    document.querySelectorAll('#tabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
+    App.ls.set('canmeeting_host_tab', t);
+  }
+  document.querySelectorAll('#tabs .tab').forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
+  setTab(new URLSearchParams(location.search).get('tab') === 'quiz' ? 'quiz' : 'run');
 
   /* ---------------- 데이터 구독 ---------------- */
   App.ready.then(() => {
