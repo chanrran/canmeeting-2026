@@ -89,7 +89,7 @@ window.CONFIG = {
       inputNote: "5밀리미터 단위로 골라 주세요",
       input: { kind: "step", min: 210, max: 300, step: 5, unit: "", start: 260 },
       question: "우리 팀에서 가장 큰 발 사이즈는?",
-      answer: { kind: "max", gap: 5 },
+      answer: { kind: "max", gap: 5, offsets: [5, 10, -5] },   // 실제 최댓값 + 5밀리미터, + 10밀리미터, − 5밀리미터를 보기로
       points: [200, 100, 50]
     },
     {
