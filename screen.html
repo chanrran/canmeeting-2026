@@ -264,7 +264,7 @@
             '<text x="' + tx.toFixed(2) + '" y="' + ty.toFixed(2) + '" text-anchor="middle" dominant-baseline="central" fill="' + (i >= n - 3 ? '#FFD166' : '#F5F7FB') + '" font-size="15" font-weight="800" transform="rotate(' + ((i + 0.5) * seg) + ' ' + tx.toFixed(2) + ' ' + ty.toFixed(2) + ')">' + row[0] + '</text>';
         }).join('') + '</g>' +
         '<circle r="16" fill="#0F1626" stroke="#5FC3CF" stroke-width="3"/>' +
-        '<path d="M0 -112 L-11 -93 L11 -93 Z" fill="#FFD166"/></svg>';
+        '<path d="M0 -84 L-12 -110 L12 -110 Z" fill="#FFD166" stroke="#0F1626" stroke-width="2" stroke-linejoin="round"/></svg>';
       const done = q.points && q.points.length;
       return {
         cls: 's-quiz wheel',
