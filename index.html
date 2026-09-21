@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAFBFC">
 <title>우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260921f">
+<link rel="stylesheet" href="style.css?v=20260921g">
 </head>
 <body class="p">
 <div class="p-shell">
@@ -19,8 +19,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20260921f"></script>
-<script src="app.js?v=20260921f"></script>
+<script src="config.js?v=20260921g"></script>
+<script src="app.js?v=20260921g"></script>
 <script>
 (function () {
   'use strict';
@@ -214,9 +214,17 @@
     const k = z.input.kind;
     let h = '<h1>' + e(z.inputTitle) + '</h1>' + (z.inputNote ? '<p class="sub">' + e(z.inputNote) + '</p>' : '');
     if (k === 'choice') {
-      h += '<div class="qopts">' + z.input.options.map((o) => '<button type="button" class="qopt' + (o === cur ? ' on' : '') + '" data-v="' + e(o) + '">' + e(o) + '</button>').join('') + '</div>';
+      h += '<div class="qopts">' + z.input.options.map((o) => '<button type="button" class="qopt" data-v="' + e(o) + '">' + e(o) + '</button>').join('') + '</div>' +
+        '<button type="button" class="big-btn" id="ok" disabled>제출하기</button>';
       el.innerHTML = h;
-      el.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { S.sub.qedit = null; saveQuiz(z.id, b.dataset.v); rerender(); }));
+      let sel = cur || null;
+      const paint = () => {
+        el.querySelectorAll('[data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === sel));
+        el.querySelector('#ok').disabled = !sel;
+      };
+      el.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { sel = b.dataset.v; paint(); }));
+      el.querySelector('#ok').onclick = () => { if (!sel) return; S.sub.qedit = null; saveQuiz(z.id, sel); rerender(); };
+      paint();
       return;
     }
     if (k === 'step') {
@@ -253,21 +261,37 @@
     el.innerHTML = '<div class="qtop"><span class="pts">' + e(pts) + '</span><span class="left"><b id="ql">' + left() + '</b>초</span></div>' +
       '<h1>' + e(z.question) + '</h1>' +
       '<div class="qopts">' + (q.choices || []).map((c) => '<button type="button" class="qopt' + (c === picked ? ' on' : '') + '"' + (picked != null ? ' disabled' : '') + ' data-c="' + e(c) + '">' + e(c) + '</button>').join('') + '</div>' +
-      (picked != null ? '<p class="sub">제출했습니다. 큰 화면을 봐 주세요</p>' : '<p class="sub">하나만 고르면 바로 제출됩니다</p>');
+      (picked != null
+        ? '<p class="sub">제출했습니다. 큰 화면을 봐 주세요</p>'
+        : '<button type="button" class="big-btn" id="qok" disabled>제출하기</button><p class="sub">답을 고르고 제출하기를 눌러 주세요</p>');
     const tick = setInterval(() => {
       const t = el.querySelector('#ql');
       if (!t) { clearInterval(tick); return; }
       t.textContent = left();
-      if (left() <= 0) { clearInterval(tick); el.querySelectorAll('[data-c]').forEach((b) => (b.disabled = true)); }
+      if (left() <= 0) {
+        clearInterval(tick);
+        el.querySelectorAll('[data-c]').forEach((b) => (b.disabled = true));
+        const ok = el.querySelector('#qok');
+        if (ok) { ok.disabled = true; ok.textContent = '시간이 지났습니다'; }
+      }
     }, 300);
     S.savers.push({ flush: () => clearInterval(tick) });
+    let sel = null;
+    const okBtn = el.querySelector('#qok');
     el.querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => {
-      if (left() <= 0) return;
-      const ms = Date.now() - (q.startedAt || 0);
-      const patch = { quizPick: {} }; patch.quizPick[z.id] = { pick: b.dataset.c, ms: ms };
-      S.resp.quizPick = Object.assign({}, S.resp.quizPick || {}); S.resp.quizPick[z.id] = { pick: b.dataset.c, ms: ms };
-      saveResp(patch); rerender();
+      if (left() <= 0 || picked != null) return;
+      sel = b.dataset.c;
+      el.querySelectorAll('[data-c]').forEach((x) => x.classList.toggle('on', x.dataset.c === sel));
+      if (okBtn) okBtn.disabled = false;
     }));
+    if (okBtn) okBtn.onclick = () => {
+      if (!sel || left() <= 0) return;
+      /* 시간은 큰 화면에 문제가 뜬 순간부터 잽니다 */
+      const ms = Date.now() - (q.startedAt || 0);
+      const patch = { quizPick: {} }; patch.quizPick[z.id] = { pick: sel, ms: ms };
+      S.resp.quizPick = Object.assign({}, S.resp.quizPick || {}); S.resp.quizPick[z.id] = { pick: sel, ms: ms };
+      saveResp(patch); rerender();
+    };
   }
   function drawQuizResult(el, z) {
     const res = (S.state.quizResults || {})[z.id];
