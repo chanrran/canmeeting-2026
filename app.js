@@ -418,7 +418,9 @@
   App.QUIZ_SECONDS = C.QUIZ_SECONDS || 10;
   App.quizById = (id) => App.QUIZZES.find((q) => q.id === id) || null;
   /* 배점 안내: 1등 50점 · 2등 30점 · 3등 10점 */
-  App.pointsText = (z) => ((z && z.points) || []).map((p, i) => (i + 1) + '등 ' + p + '점').join(' · ');
+  App.POINT_TABLE = C.QUIZ_POINT_TABLE || [[50, 30, 10]];
+  App.pointsOf = (z, q) => (q && q.points && q.points.length ? q.points : (z && z.points) || []);
+  App.pointsText = (z, q) => App.pointsOf(z, q).map((p, i) => (i + 1) + '등 ' + p + '점').join(' · ');
   /* 점수를 매기는 사람 (문제를 내는 분은 제외) */
   App.quizPlayers = () => App.members.filter((m) => !(C.QUIZ_EXCLUDE || []).includes(m.name));
   App.isQuizPlayer = (id) => App.quizPlayers().some((m) => m.id === id);
@@ -456,7 +458,13 @@
         choices: choices,
         answer: answers.join(' · '),
         answers: answers,
-        detail: { kind: 'count', rows: opts.filter((o) => count[o] > 0).map((o) => [o, count[o]]), values: values }
+        /* 보기는 0명이라도 모두 보여 주고, 보기에 없는 답이 나왔으면 뒤에 덧붙임 */
+        detail: {
+          kind: 'count',
+          rows: choices.map((o) => [o, count[o] || 0])
+            .concat(opts.filter((o) => !choices.includes(o) && count[o] > 0).map((o) => [o, count[o]])),
+          values: values
+        }
       };
     }
     const nums = vals.map(num).filter((n) => !isNaN(n));
