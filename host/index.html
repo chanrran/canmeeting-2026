@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <title>진행자 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="../style.css?v=20260921a">
+<link rel="stylesheet" href="../style.css?v=20260921b">
 </head>
 <body class="h">
 <div id="root"></div>
@@ -14,8 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="../config.js?v=20260921a"></script>
-<script src="../app.js?v=20260921a"></script>
+<script src="../config.js?v=20260921b"></script>
+<script src="../app.js?v=20260921b"></script>
 <script>
 (function () {
   'use strict';
@@ -38,6 +38,7 @@
       '<a href="../" target="_blank" rel="noopener">참가자 화면 열기 ↗</a></header>' +
     '<div class="h-wrap"><aside class="h-side" id="side"></aside><main class="h-main">' +
       '<section class="panel now" id="ctx"></section>' +
+      '<section class="panel" id="quiz"></section>' +
       '<section class="panel"><h2>제출 현황</h2><div class="status-wrap" id="status"></div></section>' +
       '<section class="panel" id="assign"></section>' +
       '<section class="panel" id="prompt"></section>' +
@@ -55,9 +56,10 @@
       H.state = App.withDefaults(d);
       renderSide(); renderCtx(); renderAssign(); renderStatus(); fillClosingOnce();
     });
-    App.db.watchCol('responses', (list) => { H.respLoaded = true; H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); });
+    App.db.watchCol('responses', (list) => { H.respLoaded = true; H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); renderQuiz(); });
     App.db.watchCol('praises', (list) => { H.praisesLoaded = true; H.praises = list; renderStatus(); renderCtx(); renderAssign(); });
     App.db.watchDoc('teamManual/current', (d) => { H.team = d; renderCtx(); fillResultOnce(); });
+    App.db.watchDoc('quizSecret/current', (d) => { H.secret = d; renderQuiz(); });
   });
   const setState = (patch) => App.db.set('session/state', patch);
   /* 배정표는 통째로 바꿔야 함(합치기 저장이면 빠진 사람의 예전 배정이 남음): 비운 뒤 새로 저장 */
@@ -199,8 +201,18 @@
         h += '<p class="desc">내년 키워드 ' + cnt(App.done.nextYearWord) + '/' + N + '</p>'; break;
       case 'closing':
         h += '<p class="desc">모두의 내년 키워드가 큰 화면에 단어 벽으로 나옵니다. 함께 본 뒤 "다음 단계"로 담당님 마무리 인사로 넘어가세요.</p>'; break;
-      case 'farewell':
-        h += '<p class="desc">큰 화면에 "Wrap-up"이 나옵니다. 담당님 마무리 인사로 행사를 마칩니다.</p>'; break;
+      case 'farewell': {
+        const cw = st.closingCurrent;
+        const nw = nextName('closingOrder', 'closingCurrent');
+        h += '<p class="desc">한 분씩 ' + App.WORD_SECONDS + '초 동안 마무리 한마디를 합니다.' + (cw ? ' 지금: <b>' + e(App.label(cw)) + '</b>' : ' "시작"을 누르면 첫 번째 분부터 시작합니다.') + '</p>' +
+          '<div class="tools">' +
+          (cw
+            ? '<button type="button" class="hb solid big" id="w1">다음 분' + (nw ? ': ' + e(nw) : ' (끝내고 Wrap-up)') + ' ▶</button><button type="button" class="hb" id="w0">◀ 이전 분</button><button type="button" class="hb" id="wr">시간 다시 시작</button>'
+            : '<button type="button" class="hb solid big" id="ws">시작</button>') +
+          '<button type="button" class="hb" id="wsh">순서 무작위 섞기</button></div>' +
+          orderList('closingOrder', 'closingCurrent');
+        break;
+      }
     }
     el.innerHTML = h;
 
@@ -208,6 +220,15 @@
     on('n1', () => step('emotionOrder', 'emotionCurrent', 1));
     on('p1', () => step('emotionOrder', 'emotionCurrent', -1));
     on('sh1', () => { const o = App.shuffle(st.emotionOrder); setState({ emotionOrder: o, emotionCurrent: o[0] }); });
+    on('ws', () => setState({ closingCurrent: st.closingOrder[0], closingStartedAt: App.now(), closingDone: false }));
+    on('w1', () => {
+      const o = st.closingOrder, i = o.indexOf(st.closingCurrent);
+      if (i >= o.length - 1) { setState({ closingCurrent: null, closingStartedAt: 0, closingDone: true }); return; }
+      setState({ closingCurrent: o[i + 1], closingStartedAt: App.now(), closingDone: false });
+    });
+    on('w0', () => { const o = st.closingOrder, i = o.indexOf(st.closingCurrent); if (i > 0) setState({ closingCurrent: o[i - 1], closingStartedAt: App.now() }); });
+    on('wr', () => setState({ closingStartedAt: App.now() }));
+    on('wsh', () => { const o = App.shuffle(st.closingOrder); setState({ closingOrder: o, closingCurrent: st.closingCurrent ? o[0] : null, closingStartedAt: st.closingCurrent ? App.now() : 0 }); });
     on('rv', () => setState({ manualRevealed: true }));
     on('n2', () => step('manualOrder', 'manualCurrent', 1, { manualRevealed: false }));
     on('p2', () => step('manualOrder', 'manualCurrent', -1, { manualRevealed: false }));
@@ -217,7 +238,7 @@
     on('sh3', () => setState({ praiseOrder: App.shuffle(st.praiseOrder), praiseTarget: null }));
     on('sp', () => setState({ teamSlide: Math.max(0, (st.teamSlide || 0) - 1) }));
     on('sn', () => setState({ teamSlide: (st.teamSlide || 0) + 1 }));
-    const of = { emotion_person: 'emotionOrder', manual_person: 'manualOrder', praise: 'praiseOrder' }[st.stage];
+    const of = { emotion_person: 'emotionOrder', manual_person: 'manualOrder', praise: 'praiseOrder', farewell: 'closingOrder' }[st.stage];
     if (of) wireOrder(el, of);
   }
 
@@ -248,6 +269,82 @@
     const N = App.members.length;
     $('status').innerHTML = '<table class="status"><thead><tr><th>이름</th><th>접속</th><th>올해 한 단어</th><th>감정 곡선</th><th>사용설명서</th><th>칭찬</th><th>내년 키워드</th></tr></thead><tbody>' + rows +
       '</tbody><tfoot><tr><td>합계</td><td>' + tot.j + '/' + N + '</td><td>' + tot.y + '/' + N + '</td><td>' + tot.em + '/' + N + '</td><td>' + tot.mn + '/' + N + '</td><td>' + tot.pr + '/' + App.praiseTotal(H.state) + '</td><td>' + tot.nx + '/' + N + '</td></tr></tfoot></table>';
+  }
+
+  /* ---------------- 팝업 퀴즈 ---------------- */
+  function quizInputs(qid) {
+    return App.members
+      .map((m) => ({ memberId: m.id, value: ((H.resp[m.id] || {}).quiz || {})[qid] }))
+      .filter((r) => r.value !== undefined && r.value !== null && r.value !== '');
+  }
+  function quizPicks(qid) {
+    return App.members
+      .map((m) => Object.assign({ memberId: m.id }, (((H.resp[m.id] || {}).quizPick || {})[qid] || {})))
+      .filter((r) => r.pick !== undefined && r.pick !== null);
+  }
+  let previewShown = null;
+  function renderQuiz() {
+    if (!H.state || !$('quiz')) return;
+    const st = H.state, q = st.quiz || {}, N = App.quizPlayers().length;
+    const results = st.quizResults || {};
+    let h = '<h2>팝업 퀴즈</h2><p class="desc">① 입력 받기 → ② 정답 미리 보기(팀장님만) → ③ 문제 내기(' + App.QUIZ_SECONDS + '초) → ④ 정답·점수 공개</p>';
+    h += '<div class="quizrows">';
+    App.QUIZZES.forEach((z, i) => {
+      const ins = quizInputs(z.id).length, picks = quizPicks(z.id).length;
+      const done = !!results[z.id];
+      const on = q.id === z.id ? q.phase : '';
+      h += '<div class="quizrow' + (on ? ' on' : '') + '">' +
+        '<div class="qn">' + (i + 1) + '</div>' +
+        '<div class="qt"><b>' + e(z.question) + '</b><span>입력 ' + ins + '/' + N + ' · 답 ' + picks + '/' + N + (done ? ' · 공개 완료' : on ? ' · 진행 중(' + e(on) + ')' : '') + '</span></div>' +
+        '<div class="qb">' +
+        '<button type="button" class="hb" data-qz="input" data-id="' + z.id + '">① 입력</button>' +
+        '<button type="button" class="hb" data-qz="peek" data-id="' + z.id + '"' + (ins ? '' : ' disabled') + '>② 미리 보기</button>' +
+        '<button type="button" class="hb solid" data-qz="ask" data-id="' + z.id + '"' + (ins ? '' : ' disabled') + '>③ 문제</button>' +
+        '<button type="button" class="hb" data-qz="reveal" data-id="' + z.id + '"' + (on === 'question' || on === 'reveal' ? '' : ' disabled') + '>④ 공개</button>' +
+        '</div></div>';
+      if (previewShown === z.id && H.secret && H.secret.id === z.id)
+        h += '<div class="peek">정답: <b>' + e(H.secret.answer) + '</b> · 보기: ' + e((H.secret.choices || []).join(' / ')) + ' <button type="button" class="linkbtn" data-qz="hide">숨기기</button></div>';
+    });
+    h += '</div>';
+    const rank = App.quizRanking(App.QUIZZES.map((z) => results[z.id]).filter(Boolean));
+    if (rank.some((r) => r.points > 0))
+      h += '<p class="note">누적 1위 ' + e(App.label(rank[0].id)) + ' ' + rank[0].points + '점</p>';
+    h += '<div class="tools"><button type="button" class="hb" data-qz="final">최종 순위 큰 화면에 띄우기</button>' +
+      '<button type="button" class="hb" data-qz="close"' + (q.phase ? '' : ' disabled') + '>퀴즈 화면 닫기</button>' +
+      '<button type="button" class="hb danger" data-qz="reset">퀴즈 기록 초기화</button></div>';
+    $('quiz').innerHTML = h;
+    $('quiz').querySelectorAll('[data-qz]').forEach((b) => (b.onclick = () => quizAction(b.dataset.qz, b.dataset.id)));
+  }
+  async function quizAction(act, id) {
+    const z = App.quizById(id);
+    if (act === 'hide') { previewShown = null; renderQuiz(); return; }
+    if (act === 'close') { await App.db.set('session/state', { quiz: null }); return; }
+    if (act === 'final') { await App.db.set('session/state', { quiz: { id: null, phase: 'final', startedAt: App.now(), choices: [] } }); return; }
+    if (act === 'reset') {
+      if (!confirm('퀴즈 입력과 점수를 모두 지울까요? 워크숍 전 연습 기록을 지울 때만 쓰세요.')) return;
+      await App.db.replace('session/state', Object.assign({}, H.state, { quiz: null, quizResults: {} }));
+      for (const m of App.members) await App.db.set('responses/' + m.id, { quiz: null, quizPick: null });
+      return;
+    }
+    if (!z) return;
+    if (act === 'input') { await App.db.set('session/state', { quiz: { id: id, phase: 'input', startedAt: 0, choices: [] } }); return; }
+    if (act === 'peek' || act === 'ask') {
+      let made = H.secret && H.secret.id === id ? H.secret : null;
+      if (!made) {
+        made = Object.assign({ id: id }, App.makeQuiz(z, quizInputs(id)));
+        await App.db.replace('quizSecret/current', made);
+      }
+      if (act === 'peek') { previewShown = id; renderQuiz(); return; }
+      previewShown = null;
+      await App.db.set('session/state', { quiz: { id: id, phase: 'question', startedAt: App.now(), choices: made.choices } });
+      return;
+    }
+    if (act === 'reveal') {
+      const made = H.secret && H.secret.id === id ? H.secret : Object.assign({ id: id }, App.makeQuiz(z, quizInputs(id)));
+      const rows = App.scoreQuiz(z, made.answer, quizPicks(id));
+      const res = {}; res[id] = { answer: made.answer, choices: made.choices, detail: made.detail || null, rows: rows, at: App.now() };
+      await App.db.set('session/state', { quizResults: res, quiz: { id: id, phase: 'reveal', startedAt: App.now(), choices: made.choices } });
+    }
   }
 
   /* ---------------- 칭찬 배정 ---------------- */
