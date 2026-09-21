@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAFBFC">
 <title>우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260921a">
+<link rel="stylesheet" href="style.css?v=20260921b">
 </head>
 <body class="p">
 <div class="p-shell">
@@ -19,8 +19,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20260921a"></script>
-<script src="app.js?v=20260921a"></script>
+<script src="config.js?v=20260921b"></script>
+<script src="app.js?v=20260921b"></script>
 <script>
 (function () {
   'use strict';
@@ -124,6 +124,7 @@
     if (!S.me) return { key: 'login', draw: drawLogin };
     if (!S.respLoaded) return null;
     const st = S.state;
+    if (st.quiz && st.quiz.phase) return quizView(st.quiz);
     const cur = (id) => App.nim(id);
     switch (st.stage) {
       case 'title':
@@ -165,10 +166,120 @@
         const words = (S.all || []).filter((r) => App.member(r.id)).map((r) => r.nextYearWord).filter(Boolean);
         return { key: 'closing-' + JSON.stringify(words), draw: (el) => drawClosing(el, words) };
       }
-      case 'farewell':
-        return info('farewell', '지금은', '담당님 마무리 인사', '오늘 함께해 주셔서 고맙습니다');
+      case 'farewell': {
+        const c = st.closingCurrent;
+        if (!c) return info('farewell', '지금은', '마무리 한마디', '오늘 함께해 주셔서 고맙습니다');
+        if (c === S.me) return info('farewell-me', '지금은', '한마디 해 주세요', App.WORD_SECONDS + '초 동안 이야기해 주세요');
+        return info('farewell-' + c, '지금은', cur(c) + ' 한마디 중', '큰 화면을 봐 주세요');
+      }
     }
     return info('unknown', '지금은', '잠시 기다려 주세요', '');
+  }
+
+  /* ---------------- 팝업 퀴즈 ---------------- */
+  function myQuiz(qid) { return ((S.resp || {}).quiz || {})[qid]; }
+  function myPick(qid) { return (((S.resp || {}).quizPick || {})[qid] || {}).pick; }
+  function quizView(q) {
+    if (q.phase === 'final') {
+      const rank = App.quizRanking(App.QUIZZES.map((x) => (S.state.quizResults || {})[x.id]).filter(Boolean));
+      const me = rank.findIndex((r) => r.id === S.me);
+      return { key: 'quiz-final', draw: (el) => {
+        el.innerHTML = '<div class="info"><div class="info-card"><div class="s1">팝업 퀴즈 최종</div>' +
+          (me >= 0 ? '<div class="big">' + (me + 1) + '등 · ' + rank[me].points + '점</div>' : '<div class="big">수고하셨습니다</div>') +
+          '<div class="s2">큰 화면을 봐 주세요</div></div></div>';
+      } };
+    }
+    const z = App.quizById(q.id);
+    if (!z) return info('quiz-wait', '지금은', '팝업 퀴즈', '큰 화면을 봐 주세요');
+    if (q.phase === 'input') return { key: 'quiz-in-' + q.id + '-' + (myQuiz(q.id) || '') + '-' + (S.sub.qedit || ''), draw: (el) => drawQuizInput(el, z) };
+    if (q.phase === 'question') return { key: 'quiz-q-' + q.id + '-' + q.startedAt + '-' + (myPick(q.id) || ''), draw: (el) => drawQuizAsk(el, z, q) };
+    return { key: 'quiz-r-' + q.id, draw: (el) => drawQuizResult(el, z) };
+  }
+  function saveQuiz(qid, value) {
+    const patch = { quiz: {} }; patch.quiz[qid] = value;
+    S.resp.quiz = Object.assign({}, S.resp.quiz || {}); S.resp.quiz[qid] = value;
+    saveResp(patch);
+  }
+  function drawQuizInput(el, z) {
+    const cur = myQuiz(z.id);
+    const done = cur != null && cur !== '' && S.sub.qedit !== z.id;
+    if (done) {
+      el.innerHTML = '<h1>' + e(z.inputTitle) + '</h1>' +
+        '<div class="info-card"><div class="s1">제출했습니다</div><div class="big">' + e(String(cur)) + '</div>' +
+        '<div class="s2">문제는 곧 큰 화면에 나옵니다</div></div>' +
+        '<button type="button" class="linkbtn accent" id="qe">고치기</button>';
+      el.querySelector('#qe').onclick = () => { S.sub.qedit = z.id; rerender(); };
+      return;
+    }
+    const k = z.input.kind;
+    let h = '<h1>' + e(z.inputTitle) + '</h1>';
+    if (k === 'choice') {
+      h += '<div class="qopts">' + z.input.options.map((o) => '<button type="button" class="qopt' + (o === cur ? ' on' : '') + '" data-v="' + e(o) + '">' + e(o) + '</button>').join('') + '</div>';
+      el.innerHTML = h;
+      el.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { S.sub.qedit = null; saveQuiz(z.id, b.dataset.v); rerender(); }));
+      return;
+    }
+    if (k === 'step') {
+      const start = cur != null && cur !== '' ? Number(cur) : (z.input.start || z.input.min);
+      h += '<div class="stepbox"><button type="button" class="stepbtn" id="mn">−</button>' +
+        '<div class="stepval"><span id="sv">' + start + '</span>' + e(z.input.unit || '') + '</div>' +
+        '<button type="button" class="stepbtn" id="pl">+</button></div>' +
+        '<button type="button" class="big-btn" id="ok">제출하기</button>';
+      el.innerHTML = h;
+      let v = start;
+      const show = () => (el.querySelector('#sv').textContent = v);
+      el.querySelector('#mn').onclick = () => { v = Math.max(z.input.min, v - z.input.step); show(); };
+      el.querySelector('#pl').onclick = () => { v = Math.min(z.input.max, v + z.input.step); show(); };
+      el.querySelector('#ok').onclick = () => { S.sub.qedit = null; saveQuiz(z.id, String(v)); rerender(); };
+      return;
+    }
+    h += '<input class="bigin" id="qi" inputmode="numeric" maxlength="' + (z.input.len || 6) + '" value="' + e(String(cur || '')) + '" placeholder="숫자만">' +
+      '<button type="button" class="big-btn" id="ok">제출하기</button>';
+    el.innerHTML = h;
+    el.querySelector('#ok').onclick = () => {
+      const v = (el.querySelector('#qi').value || '').replace(/[^0-9]/g, '');
+      if (v.length !== (z.input.len || v.length)) { App.showError('숫자 ' + z.input.len + '자리를 입력해 주세요.'); return; }
+      S.sub.qedit = null; saveQuiz(z.id, v); rerender();
+    };
+  }
+  function drawQuizAsk(el, z, q) {
+    const picked = myPick(z.id);
+    const left = () => Math.max(0, App.QUIZ_SECONDS - Math.floor((Date.now() - (q.startedAt || 0)) / 1000));
+    const pts = (z.points || []).join(' · ') + '점';
+    if (!App.isQuizPlayer(S.me)) {
+      el.innerHTML = '<h1>' + e(z.question) + '</h1><div class="info-card"><div class="s1">진행자</div><div class="big">문제를 내는 분은 참여하지 않습니다</div><div class="s2">큰 화면을 봐 주세요</div></div>';
+      return;
+    }
+    el.innerHTML = '<div class="qtop"><span class="pts">' + e(pts) + '</span><span class="left"><b id="ql">' + left() + '</b>초</span></div>' +
+      '<h1>' + e(z.question) + '</h1>' +
+      '<div class="qopts">' + (q.choices || []).map((c) => '<button type="button" class="qopt' + (c === picked ? ' on' : '') + '"' + (picked != null ? ' disabled' : '') + ' data-c="' + e(c) + '">' + e(c) + '</button>').join('') + '</div>' +
+      (picked != null ? '<p class="sub">제출했습니다. 큰 화면을 봐 주세요</p>' : '<p class="sub">하나만 고르면 바로 제출됩니다</p>');
+    const tick = setInterval(() => {
+      const t = el.querySelector('#ql');
+      if (!t) { clearInterval(tick); return; }
+      t.textContent = left();
+      if (left() <= 0) { clearInterval(tick); el.querySelectorAll('[data-c]').forEach((b) => (b.disabled = true)); }
+    }, 300);
+    S.savers.push({ flush: () => clearInterval(tick) });
+    el.querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => {
+      if (left() <= 0) return;
+      const ms = Date.now() - (q.startedAt || 0);
+      const patch = { quizPick: {} }; patch.quizPick[z.id] = { pick: b.dataset.c, ms: ms };
+      S.resp.quizPick = Object.assign({}, S.resp.quizPick || {}); S.resp.quizPick[z.id] = { pick: b.dataset.c, ms: ms };
+      saveResp(patch); rerender();
+    }));
+  }
+  function drawQuizResult(el, z) {
+    const res = (S.state.quizResults || {})[z.id];
+    if (!res) { el.innerHTML = '<div class="info"><div class="info-card"><div class="big">정답을 계산하고 있습니다</div></div></div>'; return; }
+    const mine = res.rows.find((r) => r.id === S.me);
+    const rank = App.quizRanking(App.QUIZZES.map((x) => (S.state.quizResults || {})[x.id]).filter(Boolean));
+    const myR = rank.findIndex((r) => r.id === S.me);
+    el.innerHTML = '<div class="info"><div class="info-card ' + (mine && mine.ok ? 'ok' : '') + '">' +
+      '<div class="s1">정답</div><div class="big">' + e(res.answer) + '</div>' +
+      (mine ? '<div class="s2">' + (mine.ok ? '맞히셨습니다 · +' + mine.points + '점' : '아쉽습니다 · 0점') + '</div>' : '<div class="s2">답을 내지 못하셨습니다</div>') +
+      (myR >= 0 ? '<div class="s2">누적 ' + rank[myR].points + '점 · ' + (myR + 1) + '등</div>' : '') +
+      '</div></div>';
   }
 
   /* ---------------- 로그인 ---------------- */
