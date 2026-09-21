@@ -314,7 +314,7 @@
         '<button type="button" class="hb" data-qz="reveal" data-id="' + z.id + '"' + (on === 'question' || on === 'reveal' ? '' : ' disabled') + '>④ 공개</button>' +
         '</div></div>';
       if (previewShown === z.id && H.secret && H.secret.id === z.id)
-        h += '<div class="peek">정답: <b>' + e(H.secret.answer) + '</b> · 보기: ' + e((H.secret.choices || []).join(' / ')) + ' <button type="button" class="linkbtn" data-qz="hide">숨기기</button></div>';
+        h += '<div class="peek">정답: <b>' + e(H.secret.answer) + '</b>' + ((H.secret.answers || []).length > 1 ? ' (동률 · 모두 정답)' : '') + ' · 보기: ' + e((H.secret.choices || []).join(' / ')) + ' <button type="button" class="linkbtn" data-qz="hide">숨기기</button></div>';
     });
     h += '</div>';
     const rank = App.quizRanking(App.QUIZZES.map((z) => results[z.id]).filter(Boolean));
@@ -352,8 +352,8 @@
     }
     if (act === 'reveal') {
       const made = H.secret && H.secret.id === id ? H.secret : Object.assign({ id: id }, App.makeQuiz(z, quizInputs(id)));
-      const rows = App.scoreQuiz(z, made.answer, quizPicks(id));
-      const res = {}; res[id] = { answer: made.answer, choices: made.choices, detail: made.detail || null, rows: rows, at: App.now() };
+      const rows = App.scoreQuiz(z, made.answers || [made.answer], quizPicks(id));
+      const res = {}; res[id] = { answer: made.answer, answers: made.answers || [made.answer], choices: made.choices, detail: made.detail || null, rows: rows, at: App.now() };
       await App.db.set('session/state', { quizResults: res, quiz: { id: id, phase: 'reveal', startedAt: App.now(), choices: made.choices } });
     }
   }
