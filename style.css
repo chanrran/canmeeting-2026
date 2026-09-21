@@ -689,3 +689,8 @@ body:not(.only-quiz) .tab-quiz { display: none; }
 /* 휴대폰 제출 버튼 */
 .p .big-btn { width: 100%; margin-top: 14px; padding: 18px 12px; font-size: 20px; font-weight: 800; border: 0; border-radius: 16px; background: var(--accent); color: #fff; }
 .p .big-btn:disabled { background: #D6DCE3; color: #8A94A1; }
+/* 제출하기 버튼은 늘 화면 아래 같은 자리에 */
+.p .big-btn { position: fixed; left: 16px; right: 16px; bottom: 16px; width: auto; margin: 0; z-index: 6; box-shadow: 0 6px 20px rgba(14,110,124,.25); }
+.p .big-btn:disabled { box-shadow: none; }
+.p .p-main { padding-bottom: 96px; }
+.p .qtop .pts { font-size: 13px; }
