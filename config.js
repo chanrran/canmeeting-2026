@@ -85,7 +85,8 @@ window.CONFIG = {
     },
     {
       id: "foot",
-      inputTitle: "여러분의 발 사이즈를 골라 주세요 (5밀리미터 단위)",
+      inputTitle: "여러분의 발 사이즈를 골라 주세요",
+      inputNote: "5밀리미터 단위로 골라 주세요",
       input: { kind: "step", min: 210, max: 300, step: 5, unit: "", start: 260 },
       question: "우리 팀에서 가장 큰 발 사이즈는?",
       answer: { kind: "max", gap: 5 },
@@ -94,6 +95,7 @@ window.CONFIG = {
     {
       id: "career",
       inputTitle: "여러분의 경력 년수를 입력해주세요",
+      inputNote: "개월 단위 반올림 : 예시) 1년 5개월은 2년으로 입력",
       input: { kind: "step", min: 0, max: 45, step: 1, unit: "년", start: 10 },
       question: "우리 팀의 근무 경력을 모두 더하면 몇 년일까요?",
       answer: { kind: "sum", gap: 1, unit: "년" },
