@@ -84,12 +84,11 @@ window.CONFIG = {
       points: [100, 80, 50]
     },
     {
-      id: "foot",
-      inputTitle: "여러분의 발 사이즈를 골라 주세요",
-      inputNote: "5밀리미터 단위로 골라 주세요",
-      input: { kind: "step", min: 210, max: 300, step: 5, unit: "", start: 260 },
-      question: "우리 팀에서 가장 큰 발 사이즈는?",
-      answer: { kind: "max", gap: 5, offsets: [5, 10, -5] },   // 실제 최댓값 + 5밀리미터, + 10밀리미터, − 5밀리미터를 보기로
+      id: "vacation",
+      inputTitle: "여러분이 가장 선호하는 휴가 장소를 골라 주세요",
+      input: { kind: "choice", options: ["산", "바다", "호캉스", "집콕"] },
+      question: "우리 팀이 가장 선호하는 휴가 장소는?",
+      answer: { kind: "mode" },
       points: [200, 100, 50]
     },
     {
