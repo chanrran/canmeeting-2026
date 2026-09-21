@@ -83,7 +83,7 @@
     { key: 'team_manual', name: '우리 팀 사용설명서 확인', time: '17:00' },
     { key: 'input_keyword', name: '내년 키워드 작성', time: '17:15', input: true },
     { key: 'closing', name: '우리 팀의 내년 키워드', time: '17:20' },
-    { key: 'farewell', name: '담당님 마무리 인사', time: '17:25' }
+    { key: 'farewell', name: '한 사람씩 마무리 한마디', time: '17:25' }
   ];
   App.stageName = (k) => (App.STAGES.find((s) => s.key === k) || { name: '' }).name;
   App.stageIndex = (k) => App.STAGES.findIndex((s) => s.key === k);
@@ -101,11 +101,14 @@
     praiseAssignments: null,
     praiseRound: 0,
     teamSlide: 0,
-    closingMessage: ''
+    closingMessage: '',
+    closingOrder: App.memberIds.slice(),
+    closingCurrent: null,
+    closingStartedAt: 0
   });
   App.withDefaults = (s) => {
     const st = Object.assign(App.defaultState(), s || {});
-    ['emotionOrder', 'manualOrder', 'praiseOrder'].forEach((k) => (st[k] = App.normOrder(st[k])));
+    ['emotionOrder', 'manualOrder', 'praiseOrder', 'closingOrder'].forEach((k) => (st[k] = App.normOrder(st[k])));
     return st;
   };
 
@@ -407,6 +410,82 @@
     }
     }
     return best;
+  };
+
+  /* ---------------- 팝업 퀴즈 ---------------- */
+  App.WORD_SECONDS = C.WORD_SECONDS || 30;
+  App.QUIZZES = (C.QUIZZES || []);
+  App.QUIZ_SECONDS = C.QUIZ_SECONDS || 10;
+  App.quizById = (id) => App.QUIZZES.find((q) => q.id === id) || null;
+  /* 점수를 매기는 사람 (문제를 내는 분은 제외) */
+  App.quizPlayers = () => App.members.filter((m) => !(C.QUIZ_EXCLUDE || []).includes(m.name));
+  App.isQuizPlayer = (id) => App.quizPlayers().some((m) => m.id === id);
+  const uniq = (a) => Array.from(new Set(a));
+  const num = (v) => Number(String(v).replace(/[^0-9.-]/g, ''));
+
+  /* 입력값으로 보기 4개와 정답을 만든다 (진행자 화면에서 문제를 낼 때 한 번만 실행)
+     detail.values 에는 누가 무엇을 냈는지가 들어가, 정답 화면에서 눌러 볼 수 있게 한다 */
+  App.makeQuiz = (q, inputs) => {
+    const list = (inputs || []).filter((r) => r.value !== undefined && r.value !== null && r.value !== '');
+    const vals = list.map((r) => r.value);
+    const values = list.map((r) => ({ id: r.memberId, value: r.value }));
+    const A = q.answer || {};
+    if (A.kind === 'fixed') {
+      return { choices: A.choices.slice(), answer: A.value, detail: { kind: 'fixed', values: values } };
+    }
+    if (A.kind === 'mode') {
+      const opts = (q.input.options || []).slice();
+      const count = {};
+      opts.forEach((o) => (count[o] = 0));
+      vals.forEach((v) => { count[v] = (count[v] || 0) + 1; });
+      let answer = opts[0];
+      opts.forEach((o) => { if (count[o] > count[answer]) answer = o; });
+      let choices = opts;
+      if (A.choiceCount && opts.length > A.choiceCount) {
+        /* 정답과 다른 보기 3개 (실제로 나온 띠를 먼저, 모자라면 나머지에서) */
+        const others = App.shuffle(opts.filter((o) => o !== answer && count[o] > 0))
+          .concat(App.shuffle(opts.filter((o) => o !== answer && !count[o])));
+        choices = App.shuffle([answer].concat(others.slice(0, A.choiceCount - 1)));
+      }
+      return {
+        choices: choices,
+        answer: answer,
+        detail: { kind: 'count', rows: opts.filter((o) => count[o] > 0).map((o) => [o, count[o]]), values: values }
+      };
+    }
+    const nums = vals.map(num).filter((n) => !isNaN(n));
+    const gap = A.gap || 1;
+    let answer = 0;
+    if (A.kind === 'max') answer = nums.length ? Math.max.apply(null, nums) : 0;
+    if (A.kind === 'sum') answer = nums.reduce((a, b) => a + b, 0);
+    const near = App.shuffle([-2, -1, 1, 2, 3]).slice(0, 3).map((k) => answer + k * gap).filter((v) => v !== answer && v >= 0);
+    while (near.length < 3) near.push(answer + (near.length + 3) * gap);
+    const unit = A.unit || '';
+    return {
+      choices: App.shuffle([answer].concat(near.slice(0, 3))).map((v) => String(v) + unit),
+      answer: String(answer) + unit,
+      detail: { kind: A.kind, unit: unit, values: values }
+    };
+  };
+
+  /* 맞힌 분들 중 빠른 순서대로 점수를 준다 */
+  App.scoreQuiz = (q, answer, picks) => {
+    const rows = (picks || [])
+      .filter((p) => App.isQuizPlayer(p.memberId))
+      .map((p) => ({ id: p.memberId, pick: p.pick, ms: p.ms, ok: String(p.pick) === String(answer), points: 0 }));
+    rows.filter((r) => r.ok).sort((a, b) => a.ms - b.ms).forEach((r, i) => { r.points = (q.points || [])[i] || 0; });
+    return rows.sort((a, b) => b.points - a.points || a.ms - b.ms);
+  };
+  /* 누적 순위: results = [{id(퀴즈), rows:[...]}, ...] */
+  App.quizRanking = (results) => {
+    const tot = {};
+    App.quizPlayers().forEach((m) => (tot[m.id] = { id: m.id, points: 0, correct: 0, ms: 0 }));
+    (results || []).forEach((res) => (res.rows || []).forEach((r) => {
+      if (!tot[r.id]) return;
+      tot[r.id].points += r.points || 0;
+      if (r.ok) { tot[r.id].correct++; tot[r.id].ms += r.ms || 0; }
+    }));
+    return Object.keys(tot).map((k) => tot[k]).sort((a, b) => b.points - a.points || b.correct - a.correct || a.ms - b.ms);
   };
 
   /* 아주 간단한 마크다운 표시 */
