@@ -417,6 +417,8 @@
   App.QUIZZES = (C.QUIZZES || []);
   App.QUIZ_SECONDS = C.QUIZ_SECONDS || 10;
   App.quizById = (id) => App.QUIZZES.find((q) => q.id === id) || null;
+  /* 배점 안내: 1등 50점 · 2등 30점 · 3등 10점 */
+  App.pointsText = (z) => ((z && z.points) || []).map((p, i) => (i + 1) + '등 ' + p + '점').join(' · ');
   /* 점수를 매기는 사람 (문제를 내는 분은 제외) */
   App.quizPlayers = () => App.members.filter((m) => !(C.QUIZ_EXCLUDE || []).includes(m.name));
   App.isQuizPlayer = (id) => App.quizPlayers().some((m) => m.id === id);
