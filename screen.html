@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260921a">
+<link rel="stylesheet" href="style.css?v=20260921b">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -16,9 +16,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260921a"></script>
-<script src="config.js?v=20260921a"></script>
-<script src="app.js?v=20260921a"></script>
+<script src="qrcode.js?v=20260921b"></script>
+<script src="config.js?v=20260921b"></script>
+<script src="app.js?v=20260921b"></script>
 <script>
 (function () {
   'use strict';
@@ -81,9 +81,10 @@
     if (!V.state) return;
     const st = V.state.stage;
     const brk = !!V.state.breakOn;
-    const out = brk ? drawBreak() : draw(st);
+    const qz = V.state.quiz && V.state.quiz.phase ? V.state.quiz : null;
+    const out = qz ? drawQuiz(qz) : brk ? drawBreak() : draw(st);
     const html = '<div class="s-stage ' + out.cls + '">' + out.html + '</div>';
-    const vk = brk ? 'break' : viewKey(st);
+    const vk = qz ? 'quiz:' + qz.phase + ':' + (qz.id || '') + ':' + qz.startedAt : brk ? 'break' : viewKey(st);
     const newView = vk !== V.lastVk;
     if (newView) V.seen = {};
     if (html !== V.lastHtml) {
@@ -107,7 +108,7 @@
     }
     V.lastVk = vk;
     /* 오른쪽 아래 QR: 접속 안내 화면(가운데에 큰 QR이 있음)을 뺀 모든 화면 */
-    const corner = st === 'lobby' && !brk ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>';
+    const corner = st === 'lobby' && !brk && !qz ? '' : '<div class="qr">' + qrImg('참가자 접속 QR') + '</div>';
     if (corner !== V.lastCorner) { V.lastCorner = corner; $corner.innerHTML = corner; }
   }
 
@@ -116,6 +117,7 @@
   /* 같은 단계 안에서도 사람·슬라이드가 바뀌면 '새 화면'으로 봄 */
   function viewKey(st) {
     const s = V.state;
+    if (st === 'farewell') return st + ':' + s.closingCurrent + ':' + s.closingStartedAt;
     if (st === 'emotion_person') return st + ':' + s.emotionCurrent;
     if (st === 'manual_person') return st + ':' + s.manualCurrent;
     if (st === 'praise') return st + ':' + s.praiseTarget;
@@ -165,6 +167,111 @@
   function drawBreak() {
     return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">Break</div>' };
   }
+  /* ---------- 팝업 퀴즈 ---------- */
+  function quizAnswered(qid) { return App.members.filter((m) => (((R(m.id) || {}).quizPick || {})[qid] || {}).pick != null).length; }
+  function quizFilled(qid) { return App.members.filter((m) => { const v = ((R(m.id) || {}).quiz || {})[qid]; return v != null && v !== ''; }).length; }
+  function nameList(ids) { return ids.map((id) => e(App.label(id))).join(', '); }
+  function qBars(rows, answer) {
+    const max = Math.max.apply(null, rows.map((r) => r[1]).concat([1]));
+    return '<div class="qbars">' + rows.map((r, i) =>
+      '<button type="button" class="qbar' + (String(r[0]) === String(answer) ? ' hit' : '') + '" data-qgrp="' + e(String(r[0])) + '" data-pop="qb' + i + '">' +
+      '<span class="lab">' + e(String(r[0])) + '</span>' +
+      '<span class="bar"><i style="width:' + Math.round((r[1] / max) * 100) + '%"></i></span>' +
+      '<span class="cnt">' + r[1] + '명</span></button>').join('') + '</div>';
+  }
+  function drawQuiz(q) {
+    const N = App.quizPlayers().length;
+    if (q.phase === 'final') return drawQuizFinal();
+    const z = App.quizById(q.id);
+    if (!z) return { cls: 's-title', html: '<div class="main">Quiz</div>' };
+    const pts = (z.points || []).join(' · ') + '점';
+    if (q.phase === 'input') {
+      return {
+        cls: 's-quiz input',
+        html: '<div class="qeyebrow" data-pop>POP QUIZ</div><h1 class="s-h1" data-pop>' + e(z.inputTitle) + '</h1>' +
+          '<p class="s-lead" data-pop>휴대폰에서 입력해 주세요. 무엇에 쓰는지는 곧 알려 드립니다</p>' +
+          '<div class="qcount" data-pop><em>' + quizFilled(z.id) + '</em> / ' + App.members.length + ' 입력</div>'
+      };
+    }
+    if (q.phase === 'question') {
+      const left = Math.max(0, App.QUIZ_SECONDS - Math.floor((Date.now() - (q.startedAt || 0)) / 1000));
+      return {
+        cls: 's-quiz ask',
+        html: '<div class="qeyebrow" data-pop>POP QUIZ · ' + e(pts) + '</div><h1 class="s-h1" data-pop>' + e(z.question) + '</h1>' +
+          '<div class="qchoices">' + (q.choices || []).map((c, i) => '<div class="qc" data-pop="qc' + i + '"><b>' + (i + 1) + '</b>' + e(c) + '</div>').join('') + '</div>' +
+          '<div class="qtimer"><div class="clock" id="qclock">' + left + '</div><div class="qsub">초 · 제출 <em id="qsent">' + quizAnswered(z.id) + '</em> / ' + N + '명</div></div>',
+        after: (el) => startClock(el, q.startedAt)
+      };
+    }
+    const res = (V.state.quizResults || {})[z.id];
+    if (!res) return { cls: 's-quiz', html: '<h1 class="s-h1">정답을 계산하고 있습니다</h1>' };
+    const top = res.rows.filter((r) => r.points > 0).slice(0, 3);
+    const rank = App.quizRanking(App.QUIZZES.map((x) => (V.state.quizResults || {})[x.id]).filter(Boolean)).slice(0, 4);
+    const d = res.detail || {};
+    let stats = '';
+    if (d.kind === 'count') {
+      stats = qBars(d.rows || [], res.answer) + '<p class="qhint">막대를 누르면 누가 냈는지 볼 수 있습니다</p><div class="qnames" id="qnames"></div>';
+    } else if (d.kind === 'max' || d.kind === 'sum') {
+      const vs = (d.values || []).slice().sort((a, b) => Number(b.value) - Number(a.value));
+      const mx = Math.max.apply(null, vs.map((v) => Number(v.value)).concat([1]));
+      stats = '<div class="qvals">' + vs.map((v, i) =>
+        '<button type="button" class="qv' + (d.kind === 'max' && Number(v.value) === mx ? ' hit' : '') + '" data-qname="' + e(App.label(v.id)) + ' · ' + e(String(v.value)) + (d.unit || '') + '" data-pop="qv' + i + '">' +
+        '<span class="bar"><i style="width:' + Math.round((Number(v.value) / mx) * 100) + '%"></i></span><span class="num">' + e(String(v.value)) + (d.unit || '') + '</span></button>').join('') + '</div>' +
+        '<p class="qhint">막대를 누르면 누구의 값인지 볼 수 있습니다' + (d.kind === 'sum' ? ' · 모두 더하면 ' + e(res.answer) : '') + '</p><div class="qnames" id="qnames"></div>';
+    } else {
+      const cnt = {};
+      (res.choices || []).forEach((c) => (cnt[c] = 0));
+      res.rows.forEach((r) => { if (cnt[r.pick] != null) cnt[r.pick]++; });
+      stats = qBars(Object.keys(cnt).map((k) => [k, cnt[k]]), res.answer) + '<p class="qhint">우리가 고른 답입니다</p><div class="qnames" id="qnames"></div>';
+    }
+    return {
+      cls: 's-quiz reveal',
+      html: '<div class="qeyebrow" data-pop>정답</div><h1 class="s-h1" data-pop>' + e(res.answer) + '</h1>' +
+        '<div class="qcols"><div class="qstats">' + stats + '</div>' +
+        '<div class="qscore"><div class="qsh">이번 문항</div>' +
+        (top.length ? '<ol class="qtop">' + top.map((r) => '<li><span>' + e(App.label(r.id)) + '</span><b>+' + r.points + '</b></li>').join('') + '</ol>' : '<p class="qnone">맞힌 분이 없습니다</p>') +
+        '<div class="qsh">누적 순위</div><ol class="qrank">' + rank.map((r, i) => '<li class="r' + (i + 1) + '"><span>' + e(App.label(r.id)) + '</span><b>' + r.points + '점</b></li>').join('') + '</ol></div></div>',
+      after: (el) => wireQuizNames(el, res)
+    };
+  }
+  function wireQuizNames(el, res) {
+    const box = el.querySelector('#qnames');
+    if (!box) return;
+    const vals = (res.detail || {}).values || [];
+    el.querySelectorAll('[data-qgrp]').forEach((b) => (b.onclick = () => {
+      const g = b.dataset.qgrp;
+      const ids = vals.filter((v) => String(v.value) === g).map((v) => v.id);
+      const picks = (res.rows || []).filter((r) => String(r.pick) === g).map((r) => r.id);
+      const list = ids.length ? ids : picks;
+      box.innerHTML = '<b>' + e(g) + '</b> ' + (list.length ? nameList(list) : '아무도 없습니다');
+    }));
+    el.querySelectorAll('[data-qname]').forEach((b) => (b.onclick = () => { box.innerHTML = e(b.dataset.qname); }));
+  }
+  function startClock(el, startedAt) {
+    const c = el.querySelector('#qclock');
+    if (!c) return;
+    clearInterval(V.qTimer);
+    V.qTimer = setInterval(() => {
+      if (!document.body.contains(c)) { clearInterval(V.qTimer); return; }
+      const left = Math.max(0, App.QUIZ_SECONDS - Math.floor((Date.now() - (startedAt || 0)) / 1000));
+      c.textContent = left;
+      c.classList.toggle('hot', left <= 3);
+      const sent = el.querySelector('#qsent');
+      if (sent && V.state.quiz) sent.textContent = App.members.filter((m) => (((R(m.id) || {}).quizPick || {})[V.state.quiz.id] || {}).pick != null).length;
+      if (left <= 0) clearInterval(V.qTimer);
+    }, 250);
+  }
+  function drawQuizFinal() {
+    const rank = App.quizRanking(App.QUIZZES.map((x) => (V.state.quizResults || {})[x.id]).filter(Boolean));
+    const medal = ['🥇', '🥈', '🥉'];
+    return {
+      cls: 's-quiz final',
+      html: '<div class="qeyebrow" data-pop>POP QUIZ</div><h1 class="s-h1" data-pop>최종 순위</h1>' +
+        '<div class="qpodium">' + rank.slice(0, 3).map((r, i) => '<div class="pod p' + (i + 1) + '" data-pop="pod' + i + '"><div class="m">' + medal[i] + '</div><div class="nm">' + e(App.label(r.id)) + '</div><div class="pt">' + r.points + '점</div></div>').join('') + '</div>' +
+        '<ol class="qrest">' + rank.slice(3).map((r, i) => '<li>' + (i + 4) + '. ' + e(App.label(r.id)) + ' · ' + r.points + '점</li>').join('') + '</ol>'
+    };
+  }
+
   function drawTitle() {
     const meta = [fmtDate(CONFIG.EVENT_DATE), CONFIG.TEAM_NAME].filter(Boolean).join(' · ');
     return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">' + e(CONFIG.EVENT_SUBTITLE) + '</div><div class="rule"></div>' + (meta ? '<div class="meta">' + e(meta) + '</div>' : '') + '<div class="opening">Opening</div>' };
@@ -452,7 +559,29 @@
 
   /* ---------- 담당님 마무리 인사 ---------- */
   function drawFarewell() {
-    return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">Wrap-up</div>' };
+    const st = V.state, cur = st.closingCurrent;
+    if (!cur) return { cls: 's-title', html: '<div class="eyebrow">' + e(CONFIG.EVENT_TITLE) + '</div><div class="main">Wrap-up</div>' + (st.closingDone ? '' : '<div class="opening">한 사람씩 마무리 한마디</div>') };
+    const order = st.closingOrder || [];
+    const i = order.indexOf(cur);
+    const left = Math.max(0, App.WORD_SECONDS - Math.floor((Date.now() - (st.closingStartedAt || 0)) / 1000));
+    const nx = i >= 0 && i < order.length - 1 ? order[i + 1] : null;
+    return {
+      cls: 's-word',
+      html: '<div class="eyebrow" data-pop>마무리 한마디 · ' + (i + 1) + ' / ' + order.length + '</div>' +
+        '<div class="who" data-pop>' + e(App.nim(cur)) + '</div>' +
+        '<div class="clock" id="wclock">' + left + '</div><div class="csub">초 남았습니다</div>' +
+        (nx ? '<div class="nextone">다음: ' + e(App.label(nx)) + '</div>' : '<div class="nextone">마지막 순서입니다</div>'),
+      after: (el) => {
+        clearInterval(V.wTimer);
+        const c = el.querySelector('#wclock');
+        V.wTimer = setInterval(() => {
+          if (!document.body.contains(c)) { clearInterval(V.wTimer); return; }
+          const s2 = Math.max(0, App.WORD_SECONDS - Math.floor((Date.now() - (V.state.closingStartedAt || 0)) / 1000));
+          c.textContent = s2;
+          c.classList.toggle('hot', s2 <= 5);
+        }, 250);
+      }
+    };
   }
 })();
 </script>
