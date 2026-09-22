@@ -689,10 +689,15 @@ body:not(.only-quiz) .tab-quiz { display: none; }
 /* 휴대폰 제출 버튼 */
 .p .big-btn { width: 100%; margin-top: 14px; padding: 18px 12px; font-size: 20px; font-weight: 800; border: 0; border-radius: 16px; background: var(--accent); color: #fff; }
 .p .big-btn:disabled { background: #D6DCE3; color: #8A94A1; }
-/* 제출하기 버튼은 늘 화면 아래 같은 자리에 */
-.p .big-btn { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: calc(100% - 48px); max-width: 420px; margin: 0; z-index: 6; box-shadow: 0 8px 24px rgba(14,110,124,.28); }
+/* 제출하기 버튼은 늘 화면 맨 아래에 붙어 있어, 스크롤하지 않아도 바로 누를 수 있습니다 */
+.p .big-btn {
+  position: sticky; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  margin-top: auto; width: 100%; max-width: 448px; align-self: center;
+  z-index: 6; box-shadow: 0 10px 26px rgba(14,110,124,.26);
+  animation: none !important;
+}
 .p .big-btn:disabled { box-shadow: none; }
-.p .p-main { padding-bottom: 24px; }
+.p .p-main { padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
 .p .qtop .pts { font-size: 13px; }
 
 .s-quiz.reveal .qsub2 { font-size: 24px; font-weight: 800; color: var(--s-accent); margin: 16px 0 8px; }
