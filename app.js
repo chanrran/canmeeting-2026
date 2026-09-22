@@ -215,24 +215,53 @@
     })();
     const wrap = (p) => p.catch((e) => { App.showError(App.koreanError(e)); throw e; });
     /* 실시간 구독: 오류가 나면 다시 로그인하고 최대 3번까지 다시 연결해 본다 */
-    let stop = null;
+    /* 열려 있는 모든 구독을 기억해 두었다가, 화면이 다시 켜지거나 인터넷이 돌아오면 한꺼번에 다시 연결한다 */
+    const live = [];
     function watch(make, cb) {
-      let tries = 0, got = false, off = null;
-      const start = () => {
-        off = make(
-          (data) => { got = true; tries = 0; App.clearError(); cb(data); },
+      const w = { make: make, cb: cb, off: null, tries: 0, timer: 0, last: 0, dead: false };
+      w.stop = () => {
+        if (w.timer) { clearTimeout(w.timer); w.timer = 0; }
+        if (w.off) { try { w.off(); } catch (err) {} w.off = null; }
+      };
+      w.start = () => {
+        w.stop();
+        if (w.dead) return;
+        w.off = w.make(
+          (data) => { w.tries = 0; w.last = Date.now(); App.clearError(); w.cb(data); },
           async (e) => {
-            if (off) { try { off(); } catch (err) {} off = null; }
-            tries++;
-            if (tries > 3) { App.showError(App.koreanError(e)); return; }
+            w.stop();
+            w.tries++;
+            /* 3번을 넘겨도 포기하지 않는다. 안내만 띄우고 계속 다시 연결한다 */
+            if (w.tries === 4) App.showError('연결이 끊어져 다시 연결하는 중입니다. 잠시만 기다려 주세요.');
             try { if (!firebase.auth().currentUser) await firebase.auth().signInAnonymously(); } catch (err) {}
-            setTimeout(start, 1200 * tries);
+            const wait = Math.min(1200 * w.tries, 5000);
+            w.timer = setTimeout(w.start, wait);
           }
         );
       };
-      start();
-      return () => { if (off) off(); };
+      w.start();
+      live.push(w);
+      return () => { w.dead = true; w.stop(); const i = live.indexOf(w); if (i >= 0) live.splice(i, 1); };
     }
+    /* 휴대폰 화면이 꺼졌다 켜지면 연결이 조용히 끊겨 있을 수 있어서, 돌아오면 바로 다시 연결한다 */
+    let resyncAt = 0;
+    function resync(force) {
+      const now = Date.now();
+      if (!force && now - resyncAt < 3000) return;
+      resyncAt = now;
+      live.forEach((w) => { w.tries = 0; w.start(); });
+    }
+    App.resync = resync;
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) resync(false); });
+    window.addEventListener('focus', () => resync(false));
+    window.addEventListener('online', () => resync(true));
+    window.addEventListener('pageshow', () => resync(false));
+    /* 혹시 모를 경우를 대비한 안전장치: 화면이 켜져 있는데 40초 넘게 아무 소식이 없으면 다시 연결 */
+    setInterval(() => {
+      if (document.hidden) return;
+      const old = live.filter((w) => w.last && Date.now() - w.last > 40000);
+      if (old.length) resync(true);
+    }, 15000);
     return {
       ready,
       get: (p) => wrap(fs.doc(p).get().then((s) => (s.exists ? s.data() : null))),
