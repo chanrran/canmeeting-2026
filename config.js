@@ -40,6 +40,7 @@ window.CONFIG = {
     { name: "문태호", role: "담당" },
     { name: "이승훈", role: "팀장" },
     { name: "조영찬", role: "팀장" },
+    { name: "조인후", role: "팀장" },
     { name: "김남연", role: "RF" },
     { name: "김주희", role: "RF" },
     { name: "문가은", role: "RF" },
