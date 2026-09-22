@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAFBFC">
 <title>우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260922b">
+<link rel="stylesheet" href="style.css?v=20260923a">
 </head>
 <body class="p">
 <div class="p-shell">
@@ -19,8 +19,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20260922b"></script>
-<script src="app.js?v=20260922b"></script>
+<script src="config.js?v=20260923a"></script>
+<script src="app.js?v=20260923a"></script>
 <script>
 (function () {
   'use strict';
@@ -267,7 +267,7 @@
       '<div class="qopts">' + (q.choices || []).map((c) => '<button type="button" class="qopt' + (c === picked ? ' on' : '') + '"' + (picked != null ? ' disabled' : '') + ' data-c="' + e(c) + '">' + e(c) + '</button>').join('') + '</div>' +
       (picked != null
         ? '<p class="sub">제출했습니다. 큰 화면을 봐 주세요</p>'
-        : '<button type="button" class="big-btn" id="qok" disabled>제출하기</button><p class="sub">답을 고르고 제출하기를 눌러 주세요</p>');
+        : '<p class="sub">답을 고르고 제출하기를 눌러 주세요</p><button type="button" class="big-btn" id="qok" disabled>제출하기</button>');
     const tick = setInterval(() => {
       const t = el.querySelector('#ql');
       if (!t) { clearInterval(tick); return; }
