@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260923c">
+<link rel="stylesheet" href="style.css?v=20260923d">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -17,9 +17,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260923c"></script>
-<script src="config.js?v=20260923c"></script>
-<script src="app.js?v=20260923c"></script>
+<script src="qrcode.js?v=20260923d"></script>
+<script src="config.js?v=20260923d"></script>
+<script src="app.js?v=20260923d"></script>
 <script>
 (function () {
   'use strict';
@@ -128,6 +128,11 @@
       tmp.innerHTML = html;
       const el = tmp.firstElementChild;
       const old = frame.querySelector('.s-stage:not(.leaving)');
+      /* 같은 화면이 다시 그려질 때는 단어 벽을 통째로 살려 두어, 칸이 자리를 옮기며 움직입니다 */
+      if (!newView && old) {
+        const ow = old.querySelector('.wall'), nw = el.querySelector('.wall');
+        if (ow && nw) nw.replaceWith(ow);
+      }
       if (newView && V.lastVk != null && !reduceMotion) {
         /* 화면이 바뀔 때: 이전 화면은 흐려지며 사라지고, 새 화면은 차례로 떠오름 */
         el.classList.add('enter');
@@ -141,6 +146,8 @@
       if (out.after) out.after(el);
       enhance(el);
     }
+    /* 사람들이 입력할 때마다 실시간으로 칸 크기를 다시 계산합니다 */
+    if (out.words) App.paintWall(frame.querySelector('.s-stage:not(.leaving) .wall'), out.words);
     if (newView) playSfx(vk, qz, st);
     V.lastVk = vk;
     /* 오른쪽 아래 QR: 접속 안내 화면(가운데에 큰 QR이 있음)을 뺀 모든 화면 */
@@ -414,7 +421,8 @@
         '<div class="joined">접속 ' + joined.length + ' / ' + N + '</div>' +
         '<div class="who">' + App.members.map((m) => '<span class="' + (App.done.joined(R(m.id)) ? 'on' : '') + '"' + (App.done.joined(R(m.id)) ? ' data-pop="j' + m.id + '"' : '') + '>' + e(m.label) + '</span>').join('') + '</div></div>' +
         '<div class="right"><h1 class="s-h1">2026년, 올해를 한 단어로</h1><p class="s-lead">휴대폰으로 QR을 찍고 이름을 누른 뒤, 떠오르는 단어 하나를 올려 주세요 · ' + words.length + '명 입력</p>' +
-        App.wordWallHtml(words, 's-wall') + '</div>'
+        '<div class="wall s-wall"></div></div>',
+      words: words
     };
   }
 
@@ -681,7 +689,8 @@
     return {
       cls: 's-closing',
       html: '<h1 class="s-h1">2027년, 우리 팀의 키워드</h1><p class="s-lead">' + words.length + '명의 한 단어</p>' +
-        '<div style="flex:1;display:flex;align-items:center;justify-content:center">' + App.wordWallHtml(words, 's-wall') + '</div>'
+        '<div class="wallbox"><div class="wall s-wall"></div></div>',
+      words: words
     };
   }
 
