@@ -726,3 +726,197 @@ body:not(.only-quiz) .tab-quiz { display: none; }
 .s-manual .rb3 { margin-right: 212px; }                /* 설명서 카드가 QR 왼쪽에서 끝나게 */
 .s-team .body { padding-right: 0; }
 .s-emo .chart svg { max-width: 100%; height: auto; }
+
+/* =====================================================================
+   디자인 정리 (2026-09-23) — 색 정체성은 그대로 두고 완성도만 끌어올림
+   내용·구조·순서·흐름은 바꾸지 않았습니다. 보이는 방식만 다듬었습니다.
+   ===================================================================== */
+:root {
+  /* 큰 화면: 같은 색조를 유지하되 단계를 정리 */
+  --s-bg: #0B1220;
+  --s-panel: #161F31;
+  --s-panel2: #1E2941;
+  --s-edge: rgba(255,255,255,.07);
+  --s-edge2: rgba(255,255,255,.12);
+  --s-ink: #F3F6FA;
+  --s-mute: #94A1B6;
+  --s-mute2: #6C7A91;
+  --s-accent: #5FC3CF;
+  --s-accent-dim: rgba(95,195,207,.14);
+  --s-gold: #FFD166;
+  --s-good: #3ED598;
+  --s-bad: #FF7B73;
+  /* 그림자 단계: 떠 있는 정도를 셋으로만 */
+  --sh1: 0 1px 2px rgba(0,0,0,.24);
+  --sh2: 0 10px 28px -8px rgba(0,0,0,.5);
+  --sh3: 0 28px 64px -16px rgba(0,0,0,.62);
+  /* 모서리 */
+  --r1: 10px; --r2: 16px; --r3: 22px;
+  --ease: cubic-bezier(.22,.68,.32,1);
+}
+body.s { background: #06080F; }
+
+/* 숫자는 어디서나 자리가 맞게 */
+.s-frame, .p-shell, .h-wrap { font-variant-numeric: tabular-nums; }
+
+/* ---------- 큰 화면: 한 가지 무대 구조 ---------- */
+.s-frame { background: var(--s-bg); }
+.s-frame::before { background: radial-gradient(circle, rgba(95,195,207,.16), transparent 66%); }
+.s-frame::after { background: radial-gradient(circle, rgba(255,209,102,.08), transparent 66%); }
+.s-stage { padding: 76px 88px 72px; gap: 30px; }
+
+.s-h1 { font-size: 66px; font-weight: 900; letter-spacing: -.022em; line-height: 1.16; text-wrap: balance; }
+.s-lead { font-size: 30px; color: var(--s-mute); letter-spacing: -.01em; }
+
+/* 제목 아래 가는 선 하나로 머리와 몸을 나눔 */
+.s-emo .head, .s-quiz .qhead { position: relative; }
+.s-emo .head::after {
+  content: ""; position: absolute; left: 0; right: 220px; bottom: -18px; height: 1px;
+  background: linear-gradient(90deg, var(--s-edge2), transparent 70%);
+}
+
+/* ---------- QR: 떠 있는 흰 사각형이 아니라 하나의 안내 모듈로 ---------- */
+.s-corner { top: 30px; right: 36px; flex-direction: column; gap: 10px; align-items: center; }
+.s-corner .qr {
+  border-radius: var(--r2); padding: 12px; background: #fff;
+  box-shadow: var(--sh2), 0 0 0 1px rgba(255,255,255,.14);
+}
+
+
+/* ---------- 표지 ---------- */
+.s-title { gap: 22px; }
+.s-title .eyebrow {
+  font-size: 26px; letter-spacing: .14em; font-weight: 700; color: var(--s-accent);
+  border: 1px solid var(--s-accent-dim); background: rgba(95,195,207,.07);
+  padding: 12px 28px; border-radius: 999px;
+}
+.s-title .main { font-size: 142px; letter-spacing: -.035em; }
+.s-title .rule { width: 88px; height: 4px; background: var(--s-gold); opacity: .9; margin: 18px auto 6px; }
+.s-title .meta { font-size: 30px; color: var(--s-mute2); }
+.s-title .opening {
+  font-size: 22px; letter-spacing: .34em; text-transform: uppercase;
+  color: var(--s-mute2); font-weight: 700;
+}
+
+/* ---------- 감정 곡선: 그래프와 월 이름이 정확히 같은 자리에 ---------- */
+.s-emo .chart { padding-right: 0; margin-top: 26px; }
+.s-emo .reasons { gap: 10px; }
+.s-emo .reasons div b { letter-spacing: -.01em; }
+.s-emo .foot {
+  gap: 0; margin-top: auto; padding: 26px 200px 0 0; border-top: 1px solid var(--s-edge);
+  display: grid; grid-template-columns: 1fr 1fr;
+}
+.s-emo .foot > div { padding-right: 48px; line-height: 1.5; }
+.s-emo .foot span {
+  display: block; margin: 0 0 6px; font-size: 19px; letter-spacing: .06em;
+  color: var(--s-mute2); font-weight: 700;
+}
+
+/* ---------- 칭찬: 카드가 화면 가운데에서 내용만큼만 ---------- */
+.s-praise .cards { align-items: center; align-content: center; gap: 44px; padding: 0 210px 0 0; }
+.s-praise .pc {
+  background: #FBFCFD; color: #131925; border-radius: var(--r3);
+  padding: 52px 56px; font-size: 40px; line-height: 1.5; min-height: 300px;
+  letter-spacing: -.015em; box-shadow: var(--sh3);
+  display: flex; align-items: center;
+}
+.s-praise .pc.back { display: grid; border-width: 2px; border-color: #2C3752; box-shadow: none; }
+.s-praise .next { color: var(--s-mute2); }
+
+/* ---------- 카드·패널 공통: 같은 모서리, 같은 테두리 ---------- */
+.s-input .grid .n, .s-team .cards > div, .tm-item, .qc, .qscore, .wheelbox { border-radius: var(--r2); }
+.s-input .grid .n { border: 1px solid var(--s-edge); box-shadow: var(--sh1); }
+.s-input .grid .n.on { border-color: rgba(62,213,152,.35); }
+
+/* ---------- 팝업 퀴즈 ---------- */
+.s-quiz .qeyebrow { letter-spacing: .14em; color: var(--s-mute2); font-weight: 700; }
+.wheelbox { box-shadow: none; }
+.wheelsvg { filter: drop-shadow(0 24px 48px rgba(0,0,0,.55)); }
+.wheelout { letter-spacing: -.02em; }
+
+/* ---------- 움직임: 더 조용하고 고르게 ---------- */
+.s-stage.enter > * { animation-timing-function: var(--ease); }
+
+/* =====================================================================
+   휴대폰 화면 다듬기
+   ===================================================================== */
+body.p { background: #F7F9FA; background-image: radial-gradient(1200px 400px at 50% -160px, #E6F2F4 0%, transparent 70%); }
+.p-top { border-bottom-color: rgba(16,30,40,.08); }
+.p-main { gap: 16px; }
+.p .qopt {
+  border-width: 1.5px; border-color: #D9E0E7; border-radius: var(--r2, 16px);
+  box-shadow: 0 1px 2px rgba(16,30,40,.05); letter-spacing: -.02em;
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+.p .qopt:active { transform: scale(.985); }
+.p .qopt.on { box-shadow: 0 6px 18px -6px rgba(14,110,124,.5); }
+.p .big-btn { border-radius: 18px; letter-spacing: -.02em; transition: transform .12s ease, background .15s ease; }
+.p .big-btn:not(:disabled):active { transform: translateY(1px); }
+.p .info-card { border-radius: 20px; }
+
+/* =====================================================================
+   진행자 화면 다듬기
+   ===================================================================== */
+.hb { letter-spacing: -.01em; }
+.quizrow { border-radius: 14px; }
+
+/* 점수판이 QR 아래에서 시작하도록 여유를 둡니다 */
+.s-quiz.reveal .qscore { margin-top: 28px; max-height: calc(100% - 28px); }
+
+/* 마무리 한마디: 이름이 접속자 명단의 2단 격자를 물려받아 왼쪽으로 붙던 문제 수정 */
+.s-word .who { display: block; font-size: 112px; letter-spacing: -.03em; margin: 6px 0 26px; }
+.s-word .eyebrow { font-size: 24px; letter-spacing: .16em; color: var(--s-accent); }
+.s-word .clock { font-size: 172px; letter-spacing: -.04em; }
+.s-word .csub { color: var(--s-mute2); font-size: 26px; }
+.s-word .nextone { color: var(--s-mute2); margin-top: 34px; }
+
+/* 접속 화면: 단어 벽이 위에 몰리지 않고 가운데에 놓이도록 */
+.s-lobby .right .wall { flex: 1; align-content: center; }
+.s-lobby .qr-guide { color: var(--s-mute2); }
+.s-lobby .bigqr { box-shadow: var(--sh3), 0 0 0 1px rgba(255,255,255,.14); }
+
+/* 최종 순위: 1·2·3등이 한눈에 구분되도록 단상에 색과 높이를 줍니다 */
+.qpodium { gap: 34px; margin-top: 40px; align-items: flex-end; }
+.qpodium .pod {
+  background: linear-gradient(180deg, #FFFFFF, #F2F5F8);
+  border-radius: var(--r3); padding: 34px 44px 30px; min-width: 300px; text-align: center;
+  box-shadow: var(--sh3); border-top: 5px solid #C7D0DA; position: relative;
+}
+.qpodium .p1 { padding-bottom: 76px; border-top-color: #E8B923; box-shadow: var(--sh3), 0 0 0 1px rgba(232,185,35,.35); }
+.qpodium .p2 { padding-bottom: 46px; border-top-color: #A9B4C2; }
+.qpodium .p3 { padding-bottom: 34px; border-top-color: #C48A52; }
+.qpodium .m { font-size: 58px; line-height: 1; }
+.qpodium .nm { font-size: 42px; font-weight: 900; letter-spacing: -.03em; margin-top: 10px; color: #131925; }
+.qpodium .pt { font-size: 30px; color: #55637A; font-weight: 700; }
+
+/* =====================================================================
+   휴대폰: 입력 화면 마감
+   ===================================================================== */
+.p h1 { letter-spacing: -.03em; line-height: 1.28; text-wrap: balance; }
+.p .sub { color: var(--ink2); }
+.mrow {
+  border-radius: 14px; border-color: #E3E8EE; padding: 12px 12px 12px 14px;
+  box-shadow: 0 1px 2px rgba(16,30,40,.04);
+}
+.mrow:not(.unset) { border-color: rgba(14,110,124,.28); background: #FCFEFE; }
+.mrow .mname { font-size: 16px; letter-spacing: -.02em; }
+.mrow .val { font-size: 16px; color: var(--accent); }
+.mrow.unset .val { color: var(--ink3); }
+.mrow .step { border-color: #DFE5EC; color: var(--ink2); }
+.mrow .step:active { background: var(--accent-soft); }
+.inp { border-color: #DDE3EA; border-radius: 12px; transition: border-color .15s ease, box-shadow .15s ease; }
+.inp:focus { box-shadow: 0 0 0 3px rgba(14,110,124,.14); }
+.field .lab { letter-spacing: -.01em; }
+
+/* 휴대폰 안내 카드 */
+.p .info-card { border: 1px solid #E6EBF0; box-shadow: 0 2px 10px -4px rgba(16,30,40,.12); }
+.p .info-card .s1 { letter-spacing: .02em; }
+.p .info-card .big { letter-spacing: -.03em; }
+
+/* =====================================================================
+   진행자 화면: 버튼과 목록 마감
+   ===================================================================== */
+.hb { border-radius: 10px; transition: background .12s ease, border-color .12s ease, transform .1s ease; }
+.hb:active { transform: translateY(1px); }
+.quizrow { border-radius: 14px; }
+.h-tabs .tab { letter-spacing: -.01em; }
