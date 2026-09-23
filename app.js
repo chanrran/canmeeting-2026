@@ -346,27 +346,113 @@
   App.strWidth = (str) => {
     let n = 0;
     for (const ch of String(str)) n += /[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55;
-    return n;
+    return Math.max(1, n);
   };
-  App.wordWallHtml = (words, cls) => {
+
+  /* 트리맵: 정해진 네모 안을 빈틈없이 나누되, 각 칸의 넓이가 그 단어를 쓴 사람 수에 비례하게 합니다.
+     (squarified treemap — 칸이 되도록 정사각형에 가깝게 나옵니다) */
+  App.treemap = (vals, W, H) => {
+    const n = vals.length;
+    const out = new Array(n);
+    if (!n || W <= 0 || H <= 0) return out;
+    const total = vals.reduce((a, b) => a + b, 0) || 1;
+    const scale = (W * H) / total;
+    const items = vals.map((v, i) => ({ i: i, a: Math.max(v, 0.0001) * scale }));
+    let x = 0, y = 0, w = W, h = H, k = 0;
+    const worst = (row, len) => {
+      let s = 0, mx = 0, mn = Infinity;
+      for (const r of row) { s += r.a; if (r.a > mx) mx = r.a; if (r.a < mn) mn = r.a; }
+      if (s <= 0 || len <= 0) return Infinity;
+      return Math.max((len * len * mx) / (s * s), (s * s) / (len * len * mn));
+    };
+    while (k < items.length) {
+      const len = Math.max(1e-6, Math.min(w, h));
+      const row = [items[k]];
+      let j = k + 1;
+      while (j < items.length && worst(row.concat([items[j]]), len) <= worst(row, len)) { row.push(items[j]); j++; }
+      const s = row.reduce((a, b) => a + b.a, 0);
+      if (w >= h) {
+        const rw = h > 0 ? s / h : w;
+        let cy = y;
+        for (const r of row) { const rh = rw > 0 ? r.a / rw : 0; out[r.i] = { x: x, y: cy, w: rw, h: rh }; cy += rh; }
+        x += rw; w -= rw;
+      } else {
+        const rh = w > 0 ? s / w : h;
+        let cx = x;
+        for (const r of row) { const rw2 = rh > 0 ? r.a / rh : 0; out[r.i] = { x: cx, y: y, w: rw2, h: rh }; cx += rw2; }
+        y += rh; h -= rh;
+      }
+      k = j;
+    }
+    return out;
+  };
+
+  /* 단어 벽 칸 계산: 많이 나온 단어일수록 넓은 칸.
+     칸의 넓이가 곧 그 단어를 쓴 사람 수를 뜻하므로, 멀리서도 한눈에 읽힙니다. */
+  App.wallCells = (words) => {
     const list = App.wordCounts(words);
-    if (!list.length) return '<p class="wall-empty">아직 올라온 단어가 없습니다</p>';
+    if (!list.length) return [];
     /* 많이 나온 순서로 두되, 같은 수끼리는 올라온 순서를 지킵니다 */
     const sorted = list.map((w, i) => ({ w: w, i: i })).sort((a, b) => b.w.count - a.w.count || a.i - b.i);
-    const top = sorted.length ? sorted[0].w.count : 1;
-    return '<div class="wall ' + (cls || '') + '">' + sorted.map((o, rank) => {
-      const w = o.w;
-      /* 칸 크기: 1등이자 2명 이상이면 가장 크게, 그다음은 중간, 나머지는 기본 */
-      const size = w.count >= 3 || (w.count === top && top >= 2 && rank === 0) ? 'sz3'
-        : w.count === 2 ? 'sz2' : 'sz1';
-      /* 글자 수가 많은 단어는 칸에 맞게 작게 */
-      const n = App.strWidth(w.word);
-      const len = n >= 7 ? ' ln3' : n >= 5 ? ' ln2' : n >= 4 ? ' ln1' : '';
-      return '<span class="w ' + size + len + ' c' + (o.i % 5) + (w.count >= 3 ? ' x3' : w.count === 2 ? ' x2' : '') +
-        '" data-pop="w' + App.esc(w.word) + w.count + '">' +
-        '<b>' + App.esc(w.word) + '</b>' +
-        (w.count > 1 ? '<small>' + w.count + '명</small>' : '') + '</span>';
-    }).join('') + '</div>';
+    /* 1명짜리 칸도 글자가 들어갈 만큼은 되도록 차이를 조금 눌러 줍니다 */
+    const boxes = App.treemap(sorted.map((o) => Math.pow(o.w.count, 0.78)), 100, 100);
+    const top = sorted[0].w.count;
+    return sorted.map((o, rank) => {
+      const b = boxes[rank] || { x: 0, y: 0, w: 0, h: 0 };
+      const c = o.w.count;
+      return {
+        word: o.w.word, count: c, box: b, n: App.strWidth(o.w.word),
+        cls: (c >= 3 || (c === top && top >= 2 && rank === 0) ? 'hi ' : c >= 2 ? 'mid ' : '') + 'c' + (o.i % 5)
+      };
+    });
+  };
+  const cellStyle = (c) => 'left:' + c.box.x.toFixed(3) + '%;top:' + c.box.y.toFixed(3) + '%;width:' +
+    c.box.w.toFixed(3) + '%;height:' + c.box.h.toFixed(3) + '%;--n:' + c.n.toFixed(2);
+  const cellInner = (c) => '<span class="wb"><b>' + App.esc(c.word) + '</b>' +
+    (c.count > 1 ? '<small>' + c.count + '명</small>' : '') + '</span>';
+
+  /* 한 번만 그리는 단어 벽 (휴대폰) */
+  App.wordWallHtml = (words, cls) => {
+    const cells = App.wallCells(words);
+    if (!cells.length) return '<p class="wall-empty">아직 올라온 단어가 없습니다</p>';
+    return '<div class="wall ' + (cls || '') + '">' + cells.map((c) =>
+      '<span class="w ' + c.cls + '" style="' + cellStyle(c) + '">' + cellInner(c) + '</span>').join('') + '</div>';
+  };
+
+  /* 살아 움직이는 단어 벽 (큰 화면):
+     한 사람이 입력할 때마다 칸을 새로 만들지 않고 자리와 크기만 바꿔 부드럽게 움직입니다. */
+  App.paintWall = (el, words) => {
+    if (!el) return;
+    const cells = App.wallCells(words);
+    const empty = el.querySelector('.wall-empty');
+    if (!cells.length) {
+      if (!empty) el.innerHTML = '<p class="wall-empty">아직 올라온 단어가 없습니다</p>';
+      return;
+    }
+    if (empty) el.innerHTML = '';
+    const have = {};
+    el.querySelectorAll('.w[data-w]').forEach((n) => (have[n.dataset.w] = n));
+    const keep = {};
+    cells.forEach((c) => {
+      keep[c.word] = 1;
+      let n = have[c.word];
+      if (!n) {
+        n = document.createElement('span');
+        n.className = 'w ' + c.cls + ' born';
+        n.dataset.w = c.word;
+        n.innerHTML = cellInner(c);
+        n.setAttribute('style', cellStyle(c));
+        el.appendChild(n);
+        /* 새로 생긴 칸은 살짝 커지며 나타납니다 */
+        requestAnimationFrame(() => n.classList.remove('born'));
+        return;
+      }
+      if (n.className !== 'w ' + c.cls) n.className = 'w ' + c.cls;
+      const inner = cellInner(c);
+      if (n.dataset.in !== inner) { n.innerHTML = inner; n.dataset.in = inner; }
+      n.setAttribute('style', cellStyle(c));
+    });
+    Object.keys(have).forEach((k) => { if (!keep[k]) have[k].remove(); });
   };
 
   /* 칭찬 배정: 섞은 순서에서 i번째 사람은 i+1번째, i+k번째에게 씀 (자기 자신 없음, 모두 2건, 맞칭찬 없음) */
