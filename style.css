@@ -920,3 +920,79 @@ body.p { background: #F7F9FA; background-image: radial-gradient(1200px 400px at 
 .hb:active { transform: translateY(1px); }
 .quizrow { border-radius: 14px; }
 .h-tabs .tab { letter-spacing: -.01em; }
+
+/* =====================================================================
+   한 단어 모자이크 — 많이 나온 단어일수록 넓은 칸
+   ===================================================================== */
+.wall { display: grid; grid-auto-flow: dense; }
+.wall .w {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; border-radius: 16px; padding: 10px 14px; line-height: 1.15;
+  background: var(--s-panel); border: 1px solid var(--s-edge);
+  letter-spacing: -.03em; overflow: hidden;
+}
+.wall .w b { font-weight: 900; display: block; }
+.wall .w small {
+  display: block; margin: 8px 0 0; font-size: 15px; font-weight: 700;
+  letter-spacing: .02em; opacity: .72;
+}
+
+/* 큰 화면 */
+.s-wall { grid-template-columns: repeat(6, 1fr); grid-auto-rows: 132px; gap: 14px; width: 100%; }
+.s-wall .w { border-radius: 20px; padding: 14px 18px; }
+.s-wall .w b { font-size: 44px; }
+.s-wall .w small { font-size: 20px; margin-top: 10px; }
+.s-wall .sz1 { grid-column: span 1; grid-row: span 1; }
+.s-wall .sz2 { grid-column: span 2; grid-row: span 1; }
+.s-wall .sz2 b { font-size: 60px; }
+.s-wall .sz3 { grid-column: span 2; grid-row: span 2; }
+.s-wall .sz3 b { font-size: 88px; }
+.s-wall .sz3 small { font-size: 24px; }
+/* 가장 많이 나온 단어는 금색으로 한 번만 힘을 줍니다 */
+.s-wall .x3, .s-wall .sz3 {
+  background: linear-gradient(160deg, rgba(255,209,102,.20), rgba(255,209,102,.06));
+  border-color: rgba(255,209,102,.42); color: var(--s-gold);
+}
+.s-wall .x2:not(.sz3) { background: var(--s-panel2); border-color: var(--s-edge2); color: #E8EEF6; }
+.s-wall .w.c1 { color: #BFEFF4; } .s-wall .w.c2 { color: #FFE3A3; }
+.s-wall .w.c3 { color: #C9F5DE; } .s-wall .w.c4 { color: #FFD1CD; }
+.s-wall .x3, .s-wall .sz3 { color: var(--s-gold); }
+.s-wall .x2:not(.sz3) { color: #E8EEF6; }
+.s-wall .w small { color: var(--s-mute); }
+
+/* 휴대폰 */
+.p-wall { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 72px; gap: 8px; }
+.p-wall .w { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+.p-wall .w b { font-size: 18px; }
+.p-wall .w small { font-size: 11px; margin-top: 4px; color: var(--ink3); }
+.p-wall .sz1 { grid-column: span 1; }
+.p-wall .sz2 { grid-column: span 2; }
+.p-wall .sz2 b { font-size: 22px; }
+.p-wall .sz3 { grid-column: span 2; grid-row: span 2; }
+.p-wall .sz3 b { font-size: 30px; }
+.p-wall .x3, .p-wall .sz3 { background: #FFFBEF; border-color: #F0D89A; color: #8A6200; }
+.p-wall .x2:not(.sz3) { background: var(--accent-soft); border-color: #B9DEE4; color: #0B5A66; }
+
+/* 긴 단어는 칸 안에 들어오도록 크기를 낮춥니다 */
+.s-wall .sz1 b { font-size: 44px; }
+.s-wall .sz1.ln1 b { font-size: 36px; }
+.s-wall .sz1.ln2 b { font-size: 29px; }
+.s-wall .sz1.ln3 b { font-size: 23px; }
+.s-wall .sz2 b { font-size: 60px; }
+.s-wall .sz2.ln2 b { font-size: 50px; }
+.s-wall .sz2.ln3 b { font-size: 38px; }
+.s-wall .sz3 b { font-size: 88px; }
+.s-wall .sz3.ln2 b { font-size: 68px; }
+.s-wall .sz3.ln3 b { font-size: 52px; }
+.wall .w b { word-break: keep-all; }
+
+.p-wall .sz1.ln2 b { font-size: 15px; }
+.p-wall .sz1.ln3 b { font-size: 13px; }
+.p-wall .sz2.ln3 b { font-size: 18px; }
+.p-wall .sz3.ln3 b { font-size: 22px; }
+
+/* 모자이크가 세로로도 고르게 차도록 */
+.s-wall { grid-auto-rows: minmax(128px, 1fr); align-content: center; max-height: 100%; }
+
+/* 모자이크 칸 높이 */
+.s-wall { grid-auto-rows: 148px; align-content: center; align-items: stretch; }
