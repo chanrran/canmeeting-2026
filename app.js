@@ -340,12 +340,33 @@
     });
     return Array.from(map, ([word, count]) => ({ word, count }));
   };
+  /* 단어 벽: 많이 나온 단어일수록 넓은 칸을 차지하는 모자이크로 그립니다.
+     칸 크기가 곧 몇 명이 썼는지를 뜻하므로, 멀리서도 한눈에 읽힙니다. */
+  /* 한글은 한 글자가 넓으므로 영문·숫자는 0.55글자로 셈 */
+  App.strWidth = (str) => {
+    let n = 0;
+    for (const ch of String(str)) n += /[\u3131-\uD79D\u4E00-\u9FFF]/.test(ch) ? 1 : 0.55;
+    return n;
+  };
   App.wordWallHtml = (words, cls) => {
     const list = App.wordCounts(words);
     if (!list.length) return '<p class="wall-empty">아직 올라온 단어가 없습니다</p>';
-    return '<div class="wall ' + (cls || '') + '">' + list.map((w, i) =>
-      '<span class="w c' + (i % 5) + (w.count >= 3 ? ' x3' : w.count === 2 ? ' x2' : '') + '" data-pop="w' + App.esc(w.word) + w.count + '">' + App.esc(w.word) +
-      (w.count > 1 ? '<small>×' + w.count + '</small>' : '') + '</span>').join('') + '</div>';
+    /* 많이 나온 순서로 두되, 같은 수끼리는 올라온 순서를 지킵니다 */
+    const sorted = list.map((w, i) => ({ w: w, i: i })).sort((a, b) => b.w.count - a.w.count || a.i - b.i);
+    const top = sorted.length ? sorted[0].w.count : 1;
+    return '<div class="wall ' + (cls || '') + '">' + sorted.map((o, rank) => {
+      const w = o.w;
+      /* 칸 크기: 1등이자 2명 이상이면 가장 크게, 그다음은 중간, 나머지는 기본 */
+      const size = w.count >= 3 || (w.count === top && top >= 2 && rank === 0) ? 'sz3'
+        : w.count === 2 ? 'sz2' : 'sz1';
+      /* 글자 수가 많은 단어는 칸에 맞게 작게 */
+      const n = App.strWidth(w.word);
+      const len = n >= 7 ? ' ln3' : n >= 5 ? ' ln2' : n >= 4 ? ' ln1' : '';
+      return '<span class="w ' + size + len + ' c' + (o.i % 5) + (w.count >= 3 ? ' x3' : w.count === 2 ? ' x2' : '') +
+        '" data-pop="w' + App.esc(w.word) + w.count + '">' +
+        '<b>' + App.esc(w.word) + '</b>' +
+        (w.count > 1 ? '<small>' + w.count + '명</small>' : '') + '</span>';
+    }).join('') + '</div>';
   };
 
   /* 칭찬 배정: 섞은 순서에서 i번째 사람은 i+1번째, i+k번째에게 씀 (자기 자신 없음, 모두 2건, 맞칭찬 없음) */
