@@ -975,3 +975,27 @@ body.p { background: #F7F9FA; background-image: radial-gradient(1200px 400px at 
 @media (prefers-reduced-motion: reduce) {
   .wall .w, .wall .wb { transition: none; }
 }
+
+/* =====================================================================
+   휴대폰: 이전으로 / 다음으로
+   ===================================================================== */
+.p-foot { padding: 10px 0 calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.p-nav {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: #fff; border: 1px solid #E3E8EE; border-radius: 14px; padding: 6px;
+  box-shadow: 0 1px 2px rgba(16,30,40,.05);
+}
+.p-nav.off { border-color: rgba(14,110,124,.4); background: #F4FBFC; }
+.navbtn {
+  flex: none; border: 0; background: transparent; color: var(--accent);
+  font-size: 15px; font-weight: 800; padding: 10px 12px; border-radius: 10px;
+  letter-spacing: -.02em; white-space: nowrap;
+}
+.navbtn:not(:disabled):active { background: var(--accent-soft); }
+.navbtn:disabled { color: #B8C0CC; }
+.navnow {
+  flex: 1; min-width: 0; text-align: center; font-size: 13px; font-weight: 700;
+  color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.p-nav.off .navnow { color: var(--accent); }
+.linkbtn.follow { font-weight: 800; color: var(--accent); }
