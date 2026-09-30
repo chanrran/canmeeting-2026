@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAFBFC">
 <title>우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260930b">
+<link rel="stylesheet" href="style.css?v=20260930c">
 </head>
 <body class="p">
 <div class="p-shell">
@@ -27,8 +27,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20260930b"></script>
-<script src="app.js?v=20260930b"></script>
+<script src="config.js?v=20260930c"></script>
+<script src="app.js?v=20260930c"></script>
 <script>
 (function () {
   'use strict';
@@ -313,7 +313,15 @@
   }
   function drawQuizAsk(el, z, q) {
     const picked = myPick(z.id);
-    const left = () => Math.max(0, App.QUIZ_SECONDS - Math.floor((Date.now() - (q.startedAt || 0)) / 1000));
+    /* 시간 재기: 보통은 큰 화면에 문제가 뜬 시각을 기준으로 잽니다.
+       휴대폰 시계가 크게 틀어져 있으면(수동 설정 등) 화면에 문제가 보인 순간부터 잽니다. */
+    const skew = Date.now() - (q.startedAt || 0);
+    /* 화면보다 시계가 앞서는(= 음수) 경우는 반드시 이 기기 기준으로 잽니다.
+       그래야 시계가 느린 기기가 0초로 기록되어 1등이 되는 일이 없습니다. */
+    const trustHost = !!q.startedAt && skew >= 0 && skew <= (App.QUIZ_SECONDS + 10) * 1000;
+    const t0 = Date.now();
+    const elapsed = () => (trustHost ? Date.now() - q.startedAt : Date.now() - t0);
+    const left = () => Math.max(0, Math.min(App.QUIZ_SECONDS, App.QUIZ_SECONDS - Math.floor(elapsed() / 1000)));
     const pts = App.pointsText(z, q);
     if (!App.isQuizPlayer(S.me)) {
       el.innerHTML = '<h1>' + e(z.question) + '</h1><div class="info-card"><div class="s1">진행자</div><div class="big">문제를 내는 분은 참여하지 않습니다</div><div class="s2">큰 화면을 봐 주세요</div></div>';
@@ -348,7 +356,7 @@
     if (okBtn) okBtn.onclick = () => {
       if (!sel || left() <= 0) return;
       /* 시간은 큰 화면에 문제가 뜬 순간부터 잽니다 */
-      const ms = Date.now() - (q.startedAt || 0);
+      const ms = Math.max(0, Math.min(elapsed(), App.QUIZ_SECONDS * 1000));
       const patch = { quizPick: {} }; patch.quizPick[z.id] = { pick: sel, ms: ms };
       S.resp.quizPick = Object.assign({}, S.resp.quizPick || {}); S.resp.quizPick[z.id] = { pick: sel, ms: ms };
       saveResp(patch); rerender();
