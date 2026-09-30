@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260930b">
+<link rel="stylesheet" href="style.css?v=20260930c">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -17,9 +17,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260930b"></script>
-<script src="config.js?v=20260930b"></script>
-<script src="app.js?v=20260930b"></script>
+<script src="qrcode.js?v=20260930c"></script>
+<script src="config.js?v=20260930c"></script>
+<script src="app.js?v=20260930c"></script>
 <script>
 (function () {
   'use strict';
@@ -34,6 +34,20 @@
     frame.style.transform = 'translate(' + (innerWidth - 1920 * s) / 2 + 'px,' + (innerHeight - 1080 * s) / 2 + 'px) scale(' + s + ')';
   }
   addEventListener('resize', fit); fit();
+
+  /* 워크숍 내내 화면이 꺼지지 않도록 붙잡아 둡니다 (브라우저가 지원할 때만) */
+  let wake = null;
+  async function keepAwake() {
+    try {
+      if (!navigator.wakeLock) return;
+      if (document.hidden) return;
+      wake = await navigator.wakeLock.request('screen');
+      wake.addEventListener('release', () => { wake = null; });
+    } catch (err) { wake = null; }
+  }
+  keepAwake();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !wake) keepAwake(); });
+  document.addEventListener('click', () => { if (!wake) keepAwake(); });
 
   /* ---------------- 참가자 주소 QR ---------------- */
   const PURL = App.participantUrl();
