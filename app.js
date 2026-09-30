@@ -455,6 +455,277 @@
     Object.keys(have).forEach((k) => { if (!keep[k]) have[k].remove(); });
   };
 
+
+  /* =====================================================================
+     사용설명서 내려받기 — 이미지(PNG) · 전체 PDF · 전체 이미지 묶음(ZIP)
+     바깥 라이브러리 없이 캔버스와 표준 기능만 씁니다.
+     ===================================================================== */
+  App.MANUAL_SECS = [
+    { k: 'strengths', t: '주요 기능', list: true },
+    { k: 'workStyle', t: '작동 방식' },
+    { k: 'personality', t: '제품 특성' },
+    { k: 'respect', t: '주의사항 — 이것만큼은 지켜주세요', warn: true },
+    { k: 'tiredSignal', t: '고장 신호' },
+    { k: 'recharge', t: '충전 방법' }
+  ];
+
+  const CARD_FONT = '"Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+  App.fontsReady = () => {
+    if (!document.fonts) return Promise.resolve();
+    const load = ['400 32px ' + CARD_FONT, '700 32px ' + CARD_FONT, '900 64px ' + CARD_FONT]
+      .map((f) => { try { return document.fonts.load(f, '사용설명서 ABC'); } catch (e) { return Promise.resolve(); } });
+    return Promise.all(load).then(() => document.fonts.ready).catch(() => {});
+  };
+
+  /* 글을 칸 너비에 맞춰 줄로 나눕니다 */
+  function wrapText(ctx, text, maxW) {
+    const out = [];
+    String(text || '').split('\n').forEach((para) => {
+      let line = '';
+      for (const ch of para) {
+        const t = line + ch;
+        if (ctx.measureText(t).width > maxW && line) { out.push(line); line = ch; }
+        else line = t;
+      }
+      out.push(line);
+    });
+    return out;
+  }
+
+  /* 한 사람의 사용설명서를 A4 세로 비율 카드로 그립니다 */
+  App.manualCanvas = function (id, resp, idx, total) {
+    const W = 1240, H = 1754, S = 2;            /* 150dpi A4 */
+    const cv = document.createElement('canvas');
+    cv.width = W * S; cv.height = H * S;
+    const c = cv.getContext('2d');
+    c.scale(S, S);
+    const mn = (resp && resp.manual) || {};
+    const mbti = (mn.mbti || '').trim().toUpperCase();
+    const INK = '#1A2233', NAVY = '#0E3F55', ACC = '#0E6E7C', MUTE = '#5B6473', WARN = '#B4451F';
+    const f = (w, s) => { c.font = w + ' ' + s + 'px ' + CARD_FONT; };
+
+    /* 종이 */
+    c.fillStyle = '#FBFAF4'; c.fillRect(0, 0, W, H);
+    c.strokeStyle = NAVY; c.lineWidth = 10; c.strokeRect(24, 24, W - 48, H - 48);
+    c.strokeStyle = '#C9D2DC'; c.lineWidth = 2; c.strokeRect(44, 44, W - 88, H - 88);
+
+    const L = 92, R = W - 92, CW = R - L;
+    let y = 128;
+
+    /* 머리말 */
+    f('700', 20); c.fillStyle = ACC;
+    c.letterSpacing = '4px';
+    c.fillText('USER MANUAL · 2026 EDITION', L, y);
+    c.letterSpacing = '0px';
+    y += 62;
+    f('900', 66); c.fillStyle = INK;
+    c.fillText('사용설명서', L, y);
+    y += 22;
+    c.fillStyle = '#E0AE3A'; c.fillRect(L, y, 96, 5);
+    y += 56;
+
+    /* 이름 · 별명 · 모델 */
+    f('900', 52); c.fillStyle = NAVY;
+    c.fillText(App.label(id), L, y + 38);
+    const nick = (mn.nickname || '').trim();
+    if (nick) {
+      f('700', 28); c.fillStyle = ACC;
+      c.fillText('"' + nick + '"', L, y + 84);
+    }
+    f('700', 22); c.fillStyle = MUTE;
+    c.textAlign = 'right';
+    c.fillText('MODEL  ' + (mbti || '—'), R, y + 38);
+    c.textAlign = 'left';
+    y += nick ? 122 : 84;
+
+    c.strokeStyle = '#D7DEE6'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(L, y); c.lineTo(R, y); c.stroke();
+    y += 44;
+
+    /* 여섯 칸 */
+    const boxes = App.MANUAL_SECS.map((p) => {
+      const val = p.list
+        ? (mn.strengths || []).map((s) => (s || '').trim()).filter(Boolean)
+        : [(mn[p.k] || '').trim()].filter(Boolean);
+      return { t: p.t, warn: p.warn, lines: val };
+    });
+    /* 칸 높이를 먼저 재서 남은 자리에 맞춰 글자 크기를 정합니다 */
+    const bottomKeep = 300;                       /* 보증서 자리 */
+    let size = 40;
+    let laid = null;
+    for (; size >= 16; size--) {
+      let hh = 0; laid = [];
+      for (const b of boxes) {
+        f('400', size);
+        const rows = [];
+        (b.lines.length ? b.lines : ['—']).forEach((t, i) => {
+          wrapText(c, (b.lines.length && boxes.indexOf(b) === 0 ? '· ' : '') + t, CW - 44).forEach((ln) => rows.push(ln));
+        });
+        const bh = 34 + rows.length * (size + 11) + 26;
+        laid.push({ t: b.t, warn: b.warn, rows: rows, h: bh });
+        hh += bh + 14;
+      }
+      if (y + hh <= H - bottomKeep) { laid.total = hh; break; }
+    }
+    /* 글이 짧으면 남는 자리를 칸 사이에 고르게 나눠 아래가 휑하지 않게 합니다 */
+    const slack = Math.max(0, (H - bottomKeep) - y - (laid.total || 0));
+    const extra = Math.min(34, slack / Math.max(1, laid.length));
+    laid.forEach((b) => {
+      c.fillStyle = b.warn ? '#FDF3EE' : '#FFFFFF';
+      c.strokeStyle = b.warn ? '#EBC3AF' : '#E2E8EF';
+      c.lineWidth = 2;
+      const rr = 14;
+      c.beginPath();
+      c.moveTo(L + rr, y); c.arcTo(R, y, R, y + b.h, rr); c.arcTo(R, y + b.h, L, y + b.h, rr);
+      c.arcTo(L, y + b.h, L, y, rr); c.arcTo(L, y, R, y, rr); c.closePath();
+      c.fill(); c.stroke();
+      f('800', 21); c.fillStyle = b.warn ? WARN : ACC;
+      c.fillText(b.t, L + 22, y + 32);
+      f('400', size); c.fillStyle = INK;
+      let ty = y + 32 + size + 16;
+      b.rows.forEach((ln) => { c.fillText(ln, L + 22, ty); ty += size + 11; });
+      y += b.h + 14 + extra;
+    });
+
+    /* 보증서 */
+    const wy = H - 268;
+    c.fillStyle = '#FFFDF5'; c.strokeStyle = NAVY; c.lineWidth = 4;
+    c.strokeRect(L, wy, CW, 196); c.fillRect(L + 2, wy + 2, CW - 4, 192);
+    c.strokeStyle = NAVY; c.lineWidth = 4; c.strokeRect(L, wy, CW, 196);
+    f('900', 24); c.fillStyle = INK; c.textAlign = 'center';
+    c.fillText('제품 보증서', W / 2, wy + 40);
+    c.textAlign = 'left';
+    c.strokeStyle = '#1A2233'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(L + 26, wy + 56); c.lineTo(R - 26, wy + 56); c.stroke();
+    const serial = 'MS-2026-' + String(idx || 1).padStart(2, '0') + (mbti ? '-' + mbti : '');
+    const rows = [
+      ['제품명', App.label(id)],
+      ['일련번호', serial],
+      ['보증 기간', '2027년 한 해 동안, 함께 일하는 모든 날'],
+      ['무상 수리', '커피 한 잔, 진심 어린 "고마워요" 한마디']
+    ];
+    let ry = wy + 86;
+    rows.forEach((r) => {
+      f('700', 18); c.fillStyle = MUTE; c.fillText(r[0], L + 26, ry);
+      f('400', 18); c.fillStyle = INK; c.fillText(r[1], L + 140, ry);
+      ry += 28;
+    });
+    /* 합격 도장 */
+    c.save();
+    c.translate(R - 92, wy + 104); c.rotate(-0.24);
+    c.strokeStyle = '#C0453F'; c.lineWidth = 4;
+    c.beginPath(); c.arc(0, 0, 52, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#C0453F'; c.textAlign = 'center';
+    f('700', 14); c.fillText('품질 검사', 0, -14);
+    f('900', 28); c.fillText('합격', 0, 16);
+    f('700', 11); c.fillText('2026 캔미팅', 0, 38);
+    c.restore();
+    c.textAlign = 'left';
+
+    /* 꼬리말 */
+    f('400', 17); c.fillStyle = MUTE;
+    c.fillText(CONFIG.EVENT_TITLE, L, H - 46);
+    c.textAlign = 'right';
+    c.fillText(total ? idx + ' / ' + total : '', R, H - 46);
+    c.textAlign = 'left';
+    return cv;
+  };
+
+  /* 내려받기 */
+  App.saveBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  App.canvasBlob = (cv, type, q) => new Promise((ok) => {
+    if (cv.toBlob) cv.toBlob((b) => ok(b), type || 'image/png', q);
+    else {
+      const d = cv.toDataURL(type || 'image/png', q).split(',')[1];
+      const bin = atob(d), u = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      ok(new Blob([u], { type: type || 'image/png' }));
+    }
+  });
+  App.fileName = (id) => String(((App.member(id) || {}).name) || '이름').replace(/[\\/:*?"<>|\s]/g, '') + '_사용설명서';
+
+  /* ---------- 여러 장을 한 PDF로 (JPEG 한 장이 한 쪽) ---------- */
+  App.imagesToPdf = function (jpegs) {
+    const PW = 595.28, PH = 841.89;             /* A4 (pt) */
+    const parts = [], offs = [];
+    let len = 0;
+    const push = (u8) => { parts.push(u8); len += u8.length; };
+    const enc = (s) => { const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i) & 0xff; return u; };
+    push(enc('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'));
+    const n = jpegs.length;
+    const total = 3 + n * 3;                     /* 1 카탈로그, 2 페이지들, 3.. */
+    const obj = (i, body) => { offs[i] = len; push(enc(i + ' 0 obj\n' + body + '\nendobj\n')); };
+    const kids = [];
+    for (let i = 0; i < n; i++) kids.push((3 + i * 3) + ' 0 R');
+    obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    obj(2, '<< /Type /Pages /Count ' + n + ' /Kids [' + kids.join(' ') + '] >>');
+    for (let i = 0; i < n; i++) {
+      const p = 3 + i * 3, ct = p + 1, im = p + 2;
+      obj(p, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW.toFixed(2) + ' ' + PH.toFixed(2) + ']' +
+        ' /Resources << /XObject << /Im0 ' + im + ' 0 R >> >> /Contents ' + ct + ' 0 R >>');
+      const stream = 'q\n' + PW.toFixed(2) + ' 0 0 ' + PH.toFixed(2) + ' 0 0 cm\n/Im0 Do\nQ\n';
+      obj(ct, '<< /Length ' + stream.length + ' >>\nstream\n' + stream + 'endstream');
+      const j = jpegs[i];
+      offs[im] = len;
+      push(enc(im + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + j.w + ' /Height ' + j.h +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + j.data.length + ' >>\nstream\n'));
+      push(j.data);
+      push(enc('\nendstream\nendobj\n'));
+    }
+    const xref = len;
+    let x = 'xref\n0 ' + total + '\n0000000000 65535 f \n';
+    for (let i = 1; i < total; i++) x += String(offs[i] || 0).padStart(10, '0') + ' 00000 n \n';
+    x += 'trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
+    push(enc(x));
+    const out = new Uint8Array(len);
+    let at = 0;
+    parts.forEach((u) => { out.set(u, at); at += u.length; });
+    return new Blob([out], { type: 'application/pdf' });
+  };
+
+  /* ---------- 여러 장을 한 ZIP으로 (압축 없이 담기) ---------- */
+  const CRCT = (() => {
+    const t = new Int32Array(256);
+    for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c; }
+    return t;
+  })();
+  const crc32 = (u8) => { let c = -1; for (let i = 0; i < u8.length; i++) c = CRCT[(c ^ u8[i]) & 0xff] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+  App.filesToZip = function (files) {           /* files: [{name, data(Uint8Array)}] */
+    const enc = new TextEncoder();
+    const chunks = [], central = [];
+    let off = 0;
+    files.forEach((f) => {
+      const nm = enc.encode(f.name), cr = crc32(f.data), sz = f.data.length;
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+      lh.setUint16(8, 0, true); lh.setUint16(10, 0, true); lh.setUint16(12, 0, true);
+      lh.setUint32(14, cr, true); lh.setUint32(18, sz, true); lh.setUint32(22, sz, true);
+      lh.setUint16(26, nm.length, true); lh.setUint16(28, 0, true);
+      chunks.push(new Uint8Array(lh.buffer), nm, f.data);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true);
+      ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+      ch.setUint32(16, cr, true); ch.setUint32(20, sz, true); ch.setUint32(24, sz, true);
+      ch.setUint16(28, nm.length, true); ch.setUint32(42, off, true);
+      central.push(new Uint8Array(ch.buffer), nm);
+      off += 30 + nm.length + sz;
+    });
+    const cs = off;
+    let clen = 0;
+    central.forEach((u) => (clen += u.length));
+    const eo = new DataView(new ArrayBuffer(22));
+    eo.setUint32(0, 0x06054b50, true);
+    eo.setUint16(8, files.length, true); eo.setUint16(10, files.length, true);
+    eo.setUint32(12, clen, true); eo.setUint32(16, cs, true);
+    return new Blob(chunks.concat(central, [new Uint8Array(eo.buffer)]), { type: 'application/zip' });
+  };
+
   /* 칭찬 배정: 섞은 순서에서 i번째 사람은 i+1번째, i+k번째에게 씀 (자기 자신 없음, 모두 2건, 맞칭찬 없음) */
   App.makeAssignments = () => {
     const ids = App.shuffle(App.memberIds);
