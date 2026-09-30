@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAFBFC">
 <title>우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260929b">
+<link rel="stylesheet" href="style.css?v=20260930a">
 </head>
 <body class="p">
 <div class="p-shell">
@@ -27,8 +27,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20260929b"></script>
-<script src="app.js?v=20260929b"></script>
+<script src="config.js?v=20260930a"></script>
+<script src="app.js?v=20260930a"></script>
 <script>
 (function () {
   'use strict';
@@ -577,7 +577,34 @@
   }
   function drawManualMine(el) {
     el.innerHTML = '<div class="mine-head">지금 내 차례입니다 · 보면서 말씀해 주세요</div>' +
-      App.manualCardHtml(S.me, S.resp.manual, { compact: true });
+      App.manualCardHtml(S.me, S.resp.manual, { compact: true }) + saveBtnHtml();
+    wireSaveBtn(el);
+  }
+
+  /* ---------------- 내 사용설명서 이미지로 저장 ---------------- */
+  function saveBtnHtml() {
+    if (!App.done.manual(S.resp)) return '';
+    return '<button type="button" class="big-btn ghost" id="savepng">내 사용설명서 이미지로 저장</button>';
+  }
+  function wireSaveBtn(el) {
+    const b = el.querySelector('#savepng');
+    if (!b) return;
+    b.onclick = async () => {
+      const old = b.textContent;
+      b.disabled = true; b.textContent = '만드는 중입니다…';
+      try {
+        await App.fontsReady();
+        const idx = App.memberIds.indexOf(S.me) + 1;
+        const cv = App.manualCanvas(S.me, S.resp, idx, App.members.length);
+        const blob = await App.canvasBlob(cv, 'image/png');
+        App.saveBlob(blob, App.fileName(S.me) + '.png');
+        b.textContent = '저장했습니다 ✓';
+        setTimeout(() => { b.textContent = old; b.disabled = false; }, 2500);
+      } catch (err) {
+        b.textContent = old; b.disabled = false;
+        App.showError('이미지를 만들지 못했습니다. 다시 눌러 주세요.');
+      }
+    };
   }
 
   /* ---------------- 배정 칭찬 ---------------- */
@@ -595,14 +622,15 @@
     const back = fromInfo
       ? '<button type="button" class="linkbtn accent" id="back" style="align-self:flex-start;padding-left:0">← 돌아가기</button>'
       : '<button type="button" class="linkbtn accent" id="back" style="align-self:flex-start;padding-left:0">← 설명서 고치기</button>';
+    const saveRow = saveBtnHtml();
     if (!assigned) {
-      el.innerHTML = back + '<div class="info"><div class="info-card"><div class="big">칭찬할 두 분을 정하고 있습니다</div><div class="s2">잠시만 기다려 주세요</div></div></div>';
-      wireBack(el, fromInfo);
+      el.innerHTML = back + '<div class="info"><div class="info-card"><div class="big">칭찬할 두 분을 정하고 있습니다</div><div class="s2">잠시만 기다려 주세요</div></div></div>' + saveRow;
+      wireBack(el, fromInfo); wireSaveBtn(el);
       return;
     }
     if (!assigned.length) {
-      el.innerHTML = back + '<div class="info"><div class="info-card"><div class="big">이번에는 칭찬을 받기만 하시면 됩니다</div><div class="s2">다른 분들이 이미 칭찬을 다 써서, 따로 쓰실 칭찬은 없습니다</div></div></div>';
-      wireBack(el, fromInfo);
+      el.innerHTML = back + '<div class="info"><div class="info-card"><div class="big">이번에는 칭찬을 받기만 하시면 됩니다</div><div class="s2">다른 분들이 이미 칭찬을 다 써서, 따로 쓰실 칭찬은 없습니다</div></div></div>' + saveRow;
+      wireBack(el, fromInfo); wireSaveBtn(el);
       return;
     }
     const LK = 'canmeeting_praise_' + round, DK = 'canmeeting_praise_draft_' + round;
@@ -628,8 +656,9 @@
     });
     const allSent = assigned.every(isSent) && !S.sub.edit;
     if (allSent) h += '<div class="done-card"><div class="check-ico">✓</div><div class="big">칭찬을 모두 보냈습니다</div><div class="s2">큰 화면을 봐 주세요</div></div>';
+    h += saveRow;
     el.innerHTML = h;
-    wireBack(el, fromInfo);
+    wireBack(el, fromInfo); wireSaveBtn(el);
 
     el.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => { S.sub.edit = b.dataset.edit; rerender(); }));
     el.querySelectorAll('.praise-slot[data-to]').forEach((slot) => {
