@@ -492,6 +492,14 @@
     return out;
   }
 
+  /* 줄바꿈 없는 글(이름·별명)이 칸을 넘지 않도록 글자 크기를 줄입니다 */
+  function fitText(c, text, maxW, weight, start, min, family) {
+    let sz = start;
+    c.font = weight + ' ' + sz + 'px ' + family;
+    while (sz > min && c.measureText(text).width > maxW) { sz -= 1; c.font = weight + ' ' + sz + 'px ' + family; }
+    return sz;
+  }
+
   /* 한 사람의 사용설명서를 A4 세로 비율 카드로 그립니다 */
   App.manualCanvas = function (id, resp, idx, total) {
     const W = 1240, H = 1754, S = 2;            /* 150dpi A4 */
@@ -525,12 +533,16 @@
     y += 56;
 
     /* 이름 · 별명 · 모델 */
-    f('900', 52); c.fillStyle = NAVY;
-    c.fillText(App.label(id), L, y + 38);
+    const nameTx = App.label(id);
+    fitText(c, nameTx, CW - 230, '900', 52, 26, CARD_FONT);
+    c.fillStyle = NAVY;
+    c.fillText(nameTx, L, y + 38);
     const nick = (mn.nickname || '').trim();
     if (nick) {
-      f('700', 28); c.fillStyle = ACC;
-      c.fillText('"' + nick + '"', L, y + 84);
+      const nq = '"' + nick + '"';
+      fitText(c, nq, CW, '700', 28, 15, CARD_FONT);
+      c.fillStyle = ACC;
+      c.fillText(nq, L, y + 84);
     }
     f('700', 22); c.fillStyle = MUTE;
     c.textAlign = 'right';
@@ -607,7 +619,8 @@
     let ry = wy + 86;
     rows.forEach((r) => {
       f('700', 18); c.fillStyle = MUTE; c.fillText(r[0], L + 26, ry);
-      f('400', 18); c.fillStyle = INK; c.fillText(r[1], L + 140, ry);
+      fitText(c, r[1], CW - 300, '400', 18, 11, CARD_FONT);
+      c.fillStyle = INK; c.fillText(r[1], L + 140, ry);
       ry += 28;
     });
     /* 합격 도장 */
