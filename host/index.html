@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <title>진행자 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="../style.css?v=20260929b">
+<link rel="stylesheet" href="../style.css?v=20260930a">
 </head>
 <body class="h">
 <div id="root"></div>
@@ -14,8 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="../config.js?v=20260929b"></script>
-<script src="../app.js?v=20260929b"></script>
+<script src="../config.js?v=20260930a"></script>
+<script src="../app.js?v=20260930a"></script>
 <script>
 (function () {
   'use strict';
@@ -44,6 +44,7 @@
       '<section class="panel tab-run"><h2>제출 현황</h2><div class="status-wrap" id="status"></div></section>' +
       '<section class="panel tab-run" id="assign"></section>' +
       '<section class="panel tab-run" id="prompt"></section>' +
+      '<section class="panel tab-run" id="download"></section>' +
       '<section class="panel tab-run" id="members"></section>' +
       '<section class="panel tab-run" id="data"></section>' +
     '</main></div>';
@@ -61,13 +62,13 @@
 
   /* ---------------- 데이터 구독 ---------------- */
   App.ready.then(() => {
-    App.watchMembers(() => { renderMembers(); if (H.state) { H.state = App.withDefaults(H.state); renderSide(); renderCtx(); renderAssign(); renderStatus(); } });
+    App.watchMembers(() => { renderMembers(); renderDownload(); if (H.state) { H.state = App.withDefaults(H.state); renderSide(); renderCtx(); renderAssign(); renderStatus(); } });
     App.db.watchDoc('session/state', (d) => {
       if (!d) { App.db.replace('session/state', App.defaultState()); return; }
       H.state = App.withDefaults(d);
       renderSide(); renderCtx(); renderAssign(); renderStatus(); renderQuiz(); fillClosingOnce();
     });
-    App.db.watchCol('responses', (list) => { H.respLoaded = true; H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); renderQuiz(); });
+    App.db.watchCol('responses', (list) => { H.respLoaded = true; H.resp = {}; list.forEach((r) => (H.resp[r.id] = r)); renderStatus(); renderCtx(); renderQuiz(); renderDownload(); });
     App.db.watchCol('praises', (list) => { H.praisesLoaded = true; H.praises = list; renderStatus(); renderCtx(); renderAssign(); });
     App.db.watchDoc('teamManual/current', (d) => { H.team = d; renderCtx(); fillResultOnce(); });
     App.db.watchDoc('quizSecret/current', (d) => { H.secret = d; renderQuiz(); });
@@ -520,6 +521,74 @@
     };
   }
   renderMembers();
+
+  /* ---------------- 사용설명서 내려받기 ---------------- */
+  function renderDownload() {
+    const done = App.members.filter((m) => App.done.manual(H.resp[m.id]));
+    let h = '<h2>사용설명서 내려받기</h2>' +
+      '<p class="note">작성을 마친 분: <b>' + done.length + ' / ' + App.members.length + '</b>명. 이름이 들어간 A4 세로 카드로 만듭니다.</p>' +
+      '<div class="tools"><button type="button" class="hb" id="dlpdf">전체 PDF로 받기</button>' +
+      '<button type="button" class="hb" id="dlzip">전체 이미지 묶음(ZIP)으로 받기</button></div>' +
+      '<p class="note" id="dlmsg"></p>' +
+      '<div class="dllist">';
+    App.members.forEach((m) => {
+      const ok = App.done.manual(H.resp[m.id]);
+      h += '<div class="dlrow' + (ok ? '' : ' off') + '"><span class="dlnm">' + e(m.label) + '</span>' +
+        (ok ? '<button type="button" class="hb small" data-dl="' + m.id + '">이미지로 받기</button>'
+            : '<span class="dlno">아직 작성 전</span>') + '</div>';
+    });
+    h += '</div>';
+    $('download').innerHTML = h;
+    $('download').querySelectorAll('[data-dl]').forEach((b) => (b.onclick = () => oneImage(b, b.dataset.dl)));
+    $('dlpdf').onclick = () => allFiles('pdf');
+    $('dlzip').onclick = () => allFiles('zip');
+  }
+  const dlmsg = (t) => { const n = $('dlmsg'); if (n) n.textContent = t; };
+  function cardOf(id) {
+    return App.manualCanvas(id, H.resp[id] || {}, App.memberIds.indexOf(id) + 1, App.members.length);
+  }
+  async function oneImage(btn, id) {
+    const old = btn.textContent;
+    btn.disabled = true; btn.textContent = '만드는 중…';
+    try {
+      await App.fontsReady();
+      const blob = await App.canvasBlob(cardOf(id), 'image/png');
+      App.saveBlob(blob, App.fileName(id) + '.png');
+      btn.textContent = '받았습니다 ✓';
+    } catch (err) { App.showError('이미지를 만들지 못했습니다. 다시 눌러 주세요.'); btn.textContent = old; }
+    setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 2200);
+  }
+  async function allFiles(kind) {
+    const list = App.members.filter((m) => App.done.manual(H.resp[m.id]));
+    if (!list.length) { dlmsg('아직 작성을 마친 분이 없습니다.'); return; }
+    const b1 = $('dlpdf'), b2 = $('dlzip');
+    b1.disabled = b2.disabled = true;
+    try {
+      await App.fontsReady();
+      const jpegs = [], files = [];
+      for (let i = 0; i < list.length; i++) {
+        dlmsg('만드는 중입니다… ' + (i + 1) + ' / ' + list.length);
+        const cv = cardOf(list[i].id);
+        if (kind === 'pdf') {
+          const blob = await App.canvasBlob(cv, 'image/jpeg', 0.92);
+          jpegs.push({ w: cv.width, h: cv.height, data: new Uint8Array(await blob.arrayBuffer()) });
+        } else {
+          const blob = await App.canvasBlob(cv, 'image/png');
+          files.push({ name: App.fileName(list[i].id) + '.png', data: new Uint8Array(await blob.arrayBuffer()) });
+        }
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      if (kind === 'pdf') App.saveBlob(App.imagesToPdf(jpegs), '우리팀_사용설명서_전체.pdf');
+      else App.saveBlob(App.filesToZip(files), '우리팀_사용설명서_전체.zip');
+      dlmsg(list.length + '명분을 받았습니다.');
+    } catch (err) {
+      App.showError('파일을 만들지 못했습니다. 다시 눌러 주세요.');
+      dlmsg('');
+    }
+    b1.disabled = b2.disabled = false;
+  }
+
+  renderDownload();
 
   /* ---------------- 데이터: CSV·테스트·초기화 ---------------- */
   $('data').innerHTML = '<h2>데이터</h2>' +
