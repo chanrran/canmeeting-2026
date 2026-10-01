@@ -1056,3 +1056,27 @@ body.p { background: #F7F9FA; background-image: radial-gradient(1200px 400px at 
 .p-main.view-in > *:nth-child(2),
 .p-main.view-in > *:nth-child(3),
 .p-main.view-in > *:nth-child(n+4) { animation: none !important; animation-delay: 0s !important; opacity: 1 !important; transform: none !important; }
+
+/* =====================================================================
+   버튼을 연달아 누를 때 화면이 확대되던 문제
+   휴대폰 브라우저는 "두 번 두드리기"를 확대 신호로 봅니다.
+   touch-action: manipulation 을 주면 그 판정을 하지 않아 바로 눌립니다.
+   (손가락 두 개로 벌려서 하는 확대는 그대로 됩니다)
+   ===================================================================== */
+button, a, label, summary,
+input[type="button"], input[type="submit"], input[type="range"],
+.qopt, .step, .stepbtn, .big-btn, .btn, .hb, .linkbtn, .navbtn, .names button,
+.mrow, .praise-slot, [data-tm], [data-qz], [data-dl], [data-v], [data-c], [data-i] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 버튼 글자가 길게 눌렀을 때 선택되지 않도록 */
+button, .qopt, .step, .stepbtn, .navbtn, .hb, .big-btn, .btn, .linkbtn {
+  -webkit-user-select: none; user-select: none;
+}
+/* 감정 곡선·경력 입력처럼 연달아 누르는 곳은 한 번 더 확실히 */
+.mrow, .mrow *, .stepbox, .stepbox *, .p-nav, .p-nav * { touch-action: manipulation; }
+/* 입력칸은 글자를 고를 수 있어야 하므로 되돌립니다 */
+input[type="text"], input[type="number"], input:not([type]), textarea {
+  -webkit-user-select: text; user-select: text;
+}
