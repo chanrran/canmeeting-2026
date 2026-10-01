@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20261001b">
+<link rel="stylesheet" href="style.css?v=20261001c">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -17,9 +17,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20261001b"></script>
-<script src="config.js?v=20261001b"></script>
-<script src="app.js?v=20261001b"></script>
+<script src="qrcode.js?v=20261001c"></script>
+<script src="config.js?v=20261001c"></script>
+<script src="app.js?v=20261001c"></script>
 <script>
 (function () {
   'use strict';
@@ -147,16 +147,8 @@
         const ow = old.querySelector('.wall'), nw = el.querySelector('.wall');
         if (ow && nw) nw.replaceWith(ow);
       }
-      if (newView && V.lastVk != null && !reduceMotion) {
-        /* 화면이 바뀔 때: 이전 화면은 흐려지며 사라지고, 새 화면은 차례로 떠오름 */
-        el.classList.add('enter');
-        old.classList.add('leaving');
-        old.after(el);
-        setTimeout(() => old.remove(), 280);
-      } else {
-        old.replaceWith(el);
-        if (newView) el.classList.add('enter');
-      }
+      /* 전환 효과 없이 바로 교체합니다 (진행자가 넘긴 즉시 바뀌도록) */
+      old.replaceWith(el);
       if (out.after) out.after(el);
       enhance(el);
     }
