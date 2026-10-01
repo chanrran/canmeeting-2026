@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <title>진행자 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="../style.css?v=20261001e">
+<link rel="stylesheet" href="../style.css?v=20261001f">
 </head>
 <body class="h">
 <div id="root"></div>
@@ -14,8 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="../config.js?v=20261001e"></script>
-<script src="../app.js?v=20261001e"></script>
+<script src="../config.js?v=20261001f"></script>
+<script src="../app.js?v=20261001f"></script>
 <script>
 (function () {
   'use strict';
@@ -62,7 +62,7 @@
 
   /* ---------------- 데이터 구독 ---------------- */
   App.ready.then(() => {
-    App.watchMembers(() => { renderMembers(); renderDownload(); if (H.state) { H.state = App.withDefaults(H.state); renderSide(); renderCtx(); renderAssign(); renderStatus(); } });
+    App.watchMembers(() => { renderMembers(); renderDownload(); renderQuiz(); if (H.state) { H.state = App.withDefaults(H.state); renderSide(); renderCtx(); renderAssign(); renderStatus(); } });
     App.db.watchDoc('session/state', (d) => {
       if (!d) { App.db.replace('session/state', App.defaultState()); return; }
       H.state = App.withDefaults(d);
@@ -284,13 +284,14 @@
   }
 
   /* ---------------- 팝업 퀴즈 ---------------- */
+  /* 퀴즈는 출제자를 뺀 참가자만 집계합니다 (명단이 바뀌어도 자동으로 따라갑니다) */
   function quizInputs(qid) {
-    return App.members
+    return App.quizPlayers()
       .map((m) => ({ memberId: m.id, value: ((H.resp[m.id] || {}).quiz || {})[qid] }))
       .filter((r) => r.value !== undefined && r.value !== null && r.value !== '');
   }
   function quizPicks(qid) {
-    return App.members
+    return App.quizPlayers()
       .map((m) => Object.assign({ memberId: m.id }, (((H.resp[m.id] || {}).quizPick || {})[qid] || {})))
       .filter((r) => r.pick !== undefined && r.pick !== null);
   }
