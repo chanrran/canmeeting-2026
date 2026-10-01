@@ -1038,3 +1038,21 @@ body.p { background: #F7F9FA; background-image: radial-gradient(1200px 400px at 
 .p-main.view-in > *:nth-child(2) { animation-delay: .025s; }
 .p-main.view-in > *:nth-child(3) { animation-delay: .05s; }
 .p-main.view-in > *:nth-child(n+4) { animation-delay: .07s; }
+
+/* =====================================================================
+   화면 전환 효과 끄기 — 데이터가 도착하는 즉시 완성된 화면이 보입니다
+   (룰렛 회전과 단어 모자이크 이동은 내용 자체이므로 그대로 둡니다)
+   ===================================================================== */
+.s-stage.leaving { animation: none !important; opacity: 0 !important; display: none !important; }
+.s-stage.enter > *,
+.s-stage.enter > *:nth-child(2),
+.s-stage.enter > *:nth-child(3),
+.s-stage.enter > *:nth-child(4),
+.s-stage.enter > *:nth-child(5),
+.s-stage.enter > *:nth-child(n+6) { animation: none !important; animation-delay: 0s !important; opacity: 1 !important; transform: none !important; filter: none !important; }
+.pop, .reveal, .dot, .s-praise .pc.pop { animation: none !important; opacity: 1 !important; transform: none !important; }
+.draw, .draw.slow { animation: none !important; stroke-dashoffset: 0 !important; }
+.p-main.view-in > *,
+.p-main.view-in > *:nth-child(2),
+.p-main.view-in > *:nth-child(3),
+.p-main.view-in > *:nth-child(n+4) { animation: none !important; animation-delay: 0s !important; opacity: 1 !important; transform: none !important; }
