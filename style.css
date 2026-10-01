@@ -1080,3 +1080,11 @@ button, .qopt, .step, .stepbtn, .navbtn, .hb, .big-btn, .btn, .linkbtn {
 input[type="text"], input[type="number"], input:not([type]), textarea {
   -webkit-user-select: text; user-select: text;
 }
+
+/* 정답이 정해진 문항: 맞히신 분 이름 */
+.s-quiz.reveal .qwho { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; }
+.s-quiz.reveal .qwho span {
+  font-size: 40px; font-weight: 800; letter-spacing: -.03em; color: var(--s-good);
+  background: rgba(62,213,152,.12); border: 1px solid rgba(62,213,152,.35);
+  border-radius: 16px; padding: 14px 26px;
+}
