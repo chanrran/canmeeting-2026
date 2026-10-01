@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAFBFC">
 <title>우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20261001h">
+<link rel="stylesheet" href="style.css?v=20261002a">
 </head>
 <body class="p">
 <div class="p-shell">
@@ -27,8 +27,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=20261001h"></script>
-<script src="app.js?v=20261001h"></script>
+<script src="config.js?v=20261002a"></script>
+<script src="app.js?v=20261002a"></script>
 <script>
 (function () {
   'use strict';
@@ -77,10 +77,28 @@
     if (S.me) watchMe();
   });
 
-  function watchMe() {
-    if (S.unwatchMe) S.unwatchMe();
+  async function watchMe() {
+    if (S.unwatchMe) { S.unwatchMe(); S.unwatchMe = null; }
     S.respLoaded = false;
-    S.unwatchMe = App.db.watchDoc('responses/' + S.me, (d) => { S.resp = d || {}; S.respLoaded = true; render(); });
+    const id = S.me;
+    /* 먼저 저장해 둔 내용을 직접 읽어서 화면을 정합니다.
+       바로 구독부터 하면, 방금 저장한 접속 기록만 담긴 '빈 상태'가 먼저 도착해
+       이미 쓴 내용이 없는 것처럼 보일 수 있습니다. */
+    try {
+      const d = await App.db.get('responses/' + id);
+      if (S.me !== id) return;
+      S.resp = d || {};
+      S.respLoaded = true;
+      S.sub = {};
+      rerender();
+    } catch (err) { /* 못 읽으면 아래 구독이 채워 줍니다 */ }
+    if (S.me !== id) return;
+    S.unwatchMe = App.db.watchDoc('responses/' + id, (d) => {
+      if (S.me !== id) return;
+      S.resp = d || {};
+      S.respLoaded = true;
+      render();
+    });
   }
 
   function onStage() {
@@ -398,8 +416,8 @@
     go.onclick = () => {
       S.me = S.pick;
       App.ls.set('canmeeting_me', S.me);
-      saveResp({ joinedAt: App.now() });
-      watchMe();
+      S.sub = {}; S.viewKey = null;
+      watchMe().then(() => saveResp({ joinedAt: App.now() }));
       rerender();
       toast(App.nim(S.me) + '으로 접속했습니다');
     };
