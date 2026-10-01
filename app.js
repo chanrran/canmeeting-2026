@@ -852,7 +852,7 @@
   App.makeQuiz = (q, inputs) => {
     const list = (inputs || []).filter((r) => r.value !== undefined && r.value !== null && r.value !== '');
     const vals = list.map((r) => r.value);
-    const values = list.map((r) => ({ id: r.memberId, value: r.value }));
+    const values = list.map((r) => ({ id: String(r.memberId), value: String(r.value) }));
     const A = q.answer || {};
     if (A.kind === 'fixed') {
       return { choices: A.choices.slice(), answer: A.value, answers: [A.value], detail: { kind: 'fixed', values: values } };
@@ -881,8 +881,9 @@
         /* 보기는 0명이라도 모두 보여 주고, 보기에 없는 답이 나왔으면 뒤에 덧붙임 */
         detail: {
           kind: 'count',
-          rows: choices.map((o) => [o, count[o] || 0])
-            .concat(opts.filter((o) => !choices.includes(o) && count[o] > 0).map((o) => [o, count[o]])),
+          /* Firestore는 배열 안의 배열을 저장하지 못하므로 {v, n} 객체로 담습니다 */
+          rows: choices.map((o) => ({ v: o, n: count[o] || 0 }))
+            .concat(opts.filter((o) => !choices.includes(o) && count[o] > 0).map((o) => ({ v: o, n: count[o] }))),
           values: values
         }
       };
@@ -912,7 +913,8 @@
     const list = (Array.isArray(answers) ? answers : [answers]).map(String);
     const rows = (picks || [])
       .filter((p) => App.isQuizPlayer(p.memberId))
-      .map((p) => ({ id: p.memberId, pick: p.pick, ms: p.ms, ok: list.includes(String(p.pick)), points: 0 }));
+      /* Firestore는 undefined를 저장하지 못하므로 빈 값은 모두 채워 둡니다 */
+      .map((p) => ({ id: p.memberId, pick: String(p.pick == null ? '' : p.pick), ms: Number(p.ms) || 0, ok: list.includes(String(p.pick)), points: 0 }));
     rows.filter((r) => r.ok).sort((a, b) => a.ms - b.ms).forEach((r, i) => { r.points = (q.points || [])[i] || 0; });
     return rows.sort((a, b) => b.points - a.points || a.ms - b.ms);
   };
