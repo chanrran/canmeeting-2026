@@ -1017,3 +1017,24 @@ body.p { background: #F7F9FA; background-image: radial-gradient(1200px 400px at 
   box-shadow: 0 6px 18px -8px rgba(14,110,124,.4); font-size: 17px; padding: 15px 12px;
 }
 .p .big-btn.ghost:disabled { background: #F2F4F7; color: #8A94A1; border-color: var(--line); }
+
+/* =====================================================================
+   화면 전환을 빠르게 — 진행자가 넘긴 순간과 화면이 바뀌는 순간의 간격 줄이기
+   (실측: 데이터 도착은 0.05-0.15초. 나머지는 모두 화면 효과 시간이었습니다)
+   ===================================================================== */
+.s-stage.leaving { animation-duration: .20s; }
+.s-stage.enter > * { animation-duration: .30s; }
+.s-stage.enter > *:nth-child(2) { animation-delay: .035s; }
+.s-stage.enter > *:nth-child(3) { animation-delay: .07s; }
+.s-stage.enter > *:nth-child(4) { animation-delay: .105s; }
+.s-stage.enter > *:nth-child(5) { animation-delay: .14s; }
+.s-stage.enter > *:nth-child(n+6) { animation-delay: .17s; }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.pop { animation-duration: .36s; }
+.s-praise .pc.pop { animation-duration: .6s; }
+
+/* 휴대폰도 같은 기준으로 */
+.p-main.view-in > * { animation-duration: .24s; }
+.p-main.view-in > *:nth-child(2) { animation-delay: .025s; }
+.p-main.view-in > *:nth-child(3) { animation-delay: .05s; }
+.p-main.view-in > *:nth-child(n+4) { animation-delay: .07s; }
