@@ -106,6 +106,8 @@
     flushSaves();
     if (S.unwatchMe) S.unwatchMe();
     S.me = null; S.resp = null; S.respLoaded = false; S.pick = null;
+    /* 앞사람의 화면 상태가 남아 다음 사람에게 보이지 않도록 모두 비웁니다 */
+    S.sub = {}; S.viewKey = null; S.navStage = null; S.all = null;
     App.ls.del('canmeeting_me');
     rerender();
   };
@@ -152,9 +154,11 @@
     if (!S.state) return;
     const v = pickView();
     if (!v) return;
-    if (v.key === S.viewKey) return;
+    /* 같은 화면이라도 사람이 다르면 다시 그립니다 */
+    const key = (S.me || 'none') + '|' + v.key;
+    if (key === S.viewKey) return;
     flushSaves();
-    S.viewKey = v.key;
+    S.viewKey = key;
     $me.textContent = S.me ? App.label(S.me) : '우리 팀 사용설명서';
     $foot.hidden = !S.me;
     paintNav();
@@ -641,7 +645,7 @@
       wireBack(el, fromInfo); wireSaveBtn(el);
       return;
     }
-    const LK = 'canmeeting_praise_' + round, DK = 'canmeeting_praise_draft_' + round;
+    const LK = 'canmeeting_praise_' + round + '_' + S.me, DK = 'canmeeting_praise_draft_' + round + '_' + S.me;
     const local = App.ls.get(LK, {});
     const drafts = App.ls.get(DK, {});
     const serverSent = (S.resp.praise && S.resp.praise.round === round && S.resp.praise.sentTo) || [];
