@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>큰 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="style.css?v=20260930c">
+<link rel="stylesheet" href="style.css?v=20261001a">
 </head>
 <body class="s">
 <div class="s-frame" id="frame">
@@ -17,9 +17,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="qrcode.js?v=20260930c"></script>
-<script src="config.js?v=20260930c"></script>
-<script src="app.js?v=20260930c"></script>
+<script src="qrcode.js?v=20261001a"></script>
+<script src="config.js?v=20261001a"></script>
+<script src="app.js?v=20261001a"></script>
 <script>
 (function () {
   'use strict';
@@ -248,13 +248,16 @@
   function nameList(ids) { return ids.map((id) => e(App.label(id))).join(', '); }
   function qBars(rows, answer, namesOf) {
     const list = (Array.isArray(answer) ? answer : [answer]).map(String);
-    const max = Math.max.apply(null, rows.map((r) => r[1]).concat([1]));
+    /* {v, n} 객체가 기본이고, 예전에 저장된 [값, 수] 형태도 함께 읽습니다 */
+    const V = (r) => String(Array.isArray(r) ? r[0] : r.v);
+    const C = (r) => Number(Array.isArray(r) ? r[1] : r.n) || 0;
+    const max = Math.max.apply(null, rows.map(C).concat([1]));
     return '<div class="qbars">' + rows.map((r, i) => {
-      const who = namesOf ? namesOf(String(r[0])) : '';
-      return '<div class="qbar' + (list.includes(String(r[0])) ? ' hit' : '') + '" data-pop="qb' + i + '">' +
-        '<span class="lab">' + e(String(r[0])) + '</span>' +
-        '<span class="bar"><i style="width:' + Math.round((r[1] / max) * 100) + '%"></i></span>' +
-        '<span class="cnt">' + r[1] + '명</span>' +
+      const who = namesOf ? namesOf(V(r)) : '';
+      return '<div class="qbar' + (list.includes(V(r)) ? ' hit' : '') + '" data-pop="qb' + i + '">' +
+        '<span class="lab">' + e(V(r)) + '</span>' +
+        '<span class="bar"><i style="width:' + Math.round((C(r) / max) * 100) + '%"></i></span>' +
+        '<span class="cnt">' + C(r) + '명</span>' +
         (who ? '<span class="who">' + who + '</span>' : '') + '</div>';
     }).join('') + '</div>';
   }
