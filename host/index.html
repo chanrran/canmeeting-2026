@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <title>진행자 화면 · 우리 팀 사용설명서</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="../style.css?v=20261001d">
+<link rel="stylesheet" href="../style.css?v=20261001e">
 </head>
 <body class="h">
 <div id="root"></div>
@@ -14,8 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="../config.js?v=20261001d"></script>
-<script src="../app.js?v=20261001d"></script>
+<script src="../config.js?v=20261001e"></script>
+<script src="../app.js?v=20261001e"></script>
 <script>
 (function () {
   'use strict';
@@ -341,10 +341,16 @@
       if (!confirm('퀴즈 입력과 점수를 모두 지울까요? 워크숍 전 연습 기록을 지울 때만 쓰세요.')) return;
       await App.db.replace('session/state', Object.assign({}, H.state, { quiz: null, quizResults: {} }));
       for (const m of App.members) await App.db.set('responses/' + m.id, { quiz: null, quizPick: null });
+      await App.db.del('quizSecret/current');   /* 미리 계산해 둔 정답도 함께 지웁니다 */
       return;
     }
     if (!z) return;
-    if (act === 'input') { await App.db.set('session/state', { quiz: { id: id, phase: 'input', startedAt: 0, choices: [], points: null, stopAt: 0, stopIdx: 0 } }); return; }
+    if (act === 'input') {
+      /* 입력을 다시 받기 시작하면 앞서 계산해 둔 정답은 버립니다 */
+      await App.db.del('quizSecret/current');
+      await App.db.set('session/state', { quiz: { id: id, phase: 'input', startedAt: 0, choices: [], points: null, stopAt: 0, stopIdx: 0 } });
+      return;
+    }
     if (act === 'wheel') {
       await App.db.set('session/state', { quiz: { id: id, phase: 'wheel', startedAt: App.now(), choices: [], points: null, stopAt: 0, stopIdx: 0 } });
       return;
@@ -355,9 +361,12 @@
       return;
     }
     if (act === 'peek' || act === 'ask') {
-      let made = H.secret && H.secret.id === id ? H.secret : null;
+      const ins = quizInputs(id);
+      /* 저장된 정답은 같은 문항이고 입력 인원이 그대로일 때만 다시 씁니다.
+         한 명이라도 더 입력했으면 정답을 새로 계산합니다. */
+      let made = H.secret && H.secret.id === id && H.secret.n === ins.length ? H.secret : null;
       if (!made) {
-        made = Object.assign({ id: id }, App.makeQuiz(z, quizInputs(id)));
+        made = Object.assign({ id: id, n: ins.length }, App.makeQuiz(z, ins));
         await App.db.replace('quizSecret/current', made);
       }
       if (act === 'peek') { previewShown = id; renderQuiz(); return; }
@@ -367,7 +376,9 @@
       return;
     }
     if (act === 'reveal') {
-      const made = H.secret && H.secret.id === id ? H.secret : Object.assign({ id: id }, App.makeQuiz(z, quizInputs(id)));
+      const ins2 = quizInputs(id);
+      const made = H.secret && H.secret.id === id && H.secret.n === ins2.length
+        ? H.secret : Object.assign({ id: id, n: ins2.length }, App.makeQuiz(z, ins2));
       const pts = (H.state.quiz && H.state.quiz.id === id && H.state.quiz.points) || z.points;
       const rows = App.scoreQuiz({ points: pts }, made.answers || [made.answer], quizPicks(id));
       const res = {}; res[id] = { answer: made.answer, answers: made.answers || [made.answer], choices: made.choices, detail: made.detail || null, rows: rows, points: pts, at: App.now() };
@@ -640,6 +651,7 @@
     await App.db.delCol('responses');
     await App.db.delCol('praises');
     await App.db.del('teamManual/current');
+    await App.db.del('quizSecret/current');
     await App.db.replace('session/state', App.defaultState());
     resultFilled = false; $('rs').value = ''; $('pt').value = ''; updateFull();
   });
