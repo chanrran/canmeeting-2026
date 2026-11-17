@@ -11,11 +11,14 @@
   var Q = {};
   window.Q = Q;
 
+  /* 진행자 화면은 host/ 아래에 있으므로 이미지 경로 앞에 ../ 를 붙입니다 */
+  var BASE = /\/host\/?$/.test(location.pathname.replace(/index\.html$/, '')) ? '../' : '';
+
   Q.count = function () { return Math.max(1, Number(C.IMAGE_COUNT) || 1); };
   Q.src = function (i) {
     var n = String(i);
     while (n.length < 2) n = '0' + n;
-    return C.IMAGE_PATH + n + C.IMAGE_EXT;
+    return BASE + C.IMAGE_PATH + n + C.IMAGE_EXT;
   };
   Q.clamp = function (i) {
     i = Number(i);
