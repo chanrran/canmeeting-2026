@@ -18,7 +18,7 @@
   Q.src = function (i) {
     var n = String(i);
     while (n.length < 2) n = '0' + n;
-    return BASE + C.IMAGE_PATH + n + C.IMAGE_EXT;
+    return BASE + C.IMAGE_PATH + n + C.IMAGE_EXT + '?v=' + (C.IMAGE_VER || '1');
   };
   Q.clamp = function (i) {
     i = Number(i);
