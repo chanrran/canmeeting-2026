@@ -59,8 +59,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=4"></script>
-<script src="../app.js?v=4"></script>
+<script src="../config.js?v=5"></script>
+<script src="../app.js?v=5"></script>
 <script>
 (function () {
   'use strict';
@@ -153,7 +153,7 @@
 
   Q.preload();
   Q.watch(function (i) { cur = i; paint(); });
-  Q.ready.then(function () { Q.refresh(); setTimeout(function () { Q.setIndex(cur); }, 800); });
+  Q.ready.then(function () { Q.refresh(); Q.initIfMissing(); });
   paint();
 })();
 </script>
