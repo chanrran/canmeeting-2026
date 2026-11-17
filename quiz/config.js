@@ -28,6 +28,10 @@ window.QCONFIG = {
   IMAGE_PATH: "images/",
   IMAGE_EXT: ".jpg",
 
+  /* 5-1) 이미지 판 번호 — 이미지를 교체할 때마다 이 숫자를 1씩 올려 주세요.
+          올리지 않으면 이미 접속했던 휴대폰이 예전 이미지를 계속 보여 줄 수 있습니다 */
+  IMAGE_VER: "2",
+
   /* 6) 참가자 주소 — 진행자 화면의 QR 코드에 쓰입니다 */
   PARTICIPANT_URL: "https://chanrran.github.io/canmeeting-2026/quiz/",
 
