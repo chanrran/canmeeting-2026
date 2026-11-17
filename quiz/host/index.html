@@ -60,16 +60,17 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
 <script src="../config.js?v=1"></script>
-<script src="../app.js?v=2"></script>
+<script src="../app.js?v=3"></script>
 <script>
 (function () {
   'use strict';
   var root = document.getElementById('root');
+  /* 암호 없이 바로 들어옵니다. 다시 걸고 싶으면 아래 주석을 풀어 주세요.
   var key = new URLSearchParams(location.search).get('key');
   if (key !== QCONFIG.ADMIN_KEY) {
     root.innerHTML = '<div class="deny">진행자 화면입니다. 주소 끝에 ?key=암호 를 붙여 주세요.</div>';
     return;
-  }
+  } */
 
   var N = Q.count();
   var cur = 0;
