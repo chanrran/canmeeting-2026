@@ -115,6 +115,14 @@
       .catch(function () { Q.net(false); });
   };
 
+  /* 문서가 없을 때만 0번으로 만듭니다. 이미 있으면 절대 건드리지 않습니다 */
+  Q.initIfMissing = function () {
+    if (!db) return;
+    db.doc(DOC()).get().then(function (snap) {
+      if (!snap.exists) Q.setIndex(0);
+    }).catch(function () {});
+  };
+
   /* ---------------- 이미지 미리 받기 ---------------- */
   Q.preload = function (onProgress) {
     var total = Q.count(), done = 0;
