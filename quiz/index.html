@@ -13,24 +13,15 @@
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
-  #wrap {
-    position: fixed; inset: 0;
-    width: 100vw; height: 100vh; height: 100dvh;
-    display: flex; align-items: center; justify-content: center;
-  }
-  #shot {
-    max-width: 100%; max-height: 100%;
-    width: auto; height: auto;
-    object-fit: contain; display: none;
-    user-select: none; -webkit-user-drag: none;
-  }
-  #load { text-align: center; color: #8a8a90; font-size: 15px; line-height: 2; }
+  #wrap { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh;
+          display: flex; align-items: center; justify-content: center; }
+  #shot { max-width: 100%; max-height: 100%; width: auto; height: auto;
+          object-fit: contain; display: none; user-select: none; -webkit-user-drag: none; }
+  #load { text-align: center; color: #8a8a90; font-size: 15px; line-height: 2; padding: 0 24px; }
   #load b { display: block; color: #fff; font-size: 17px; font-weight: 600; margin-bottom: 6px; }
-  .netbar {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-    background: #8a6a3b; color: #fff; font-size: 13px; text-align: center;
-    padding: 6px 10px; display: none;
-  }
+  .netbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+            background: #8a6a3b; color: #fff; font-size: 13px; text-align: center;
+            padding: 6px 10px; display: none; }
 </style>
 </head>
 <body>
@@ -43,34 +34,42 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="config.js?v=7"></script>
+<script src="app.js?v=7"></script>
 <script>
 (function () {
   'use strict';
   var img = document.getElementById('shot');
   var load = document.getElementById('load');
   var pg = document.getElementById('pg');
-  var cur = -1, loaded = false;
+  var cur = 0, started = false;
 
+  /* 현재 장이 정해지면 그 장부터 곧바로 띄웁니다.
+     나머지는 뒤에서 받으므로 전부 받을 때까지 기다리지 않습니다. */
   function show(i) {
     cur = i;
-    if (!loaded) return;
     img.src = Q.src(i);
+    if (!started) {
+      started = true;
+      load.style.display = 'none';
+      img.style.display = 'block';
+      Q.preloadAround(i);
+    }
+    if (Q.onBeat) Q.onBeat();
   }
 
+  img.onerror = function () {
+    var want = cur;
+    setTimeout(function () { if (cur === want) img.src = Q.src(want); }, 1500);
+  };
+
   Q.keepAwake();
-
-  Q.preload(function (done, total) {
-    pg.textContent = '불러오는 중 ' + done + ' / ' + total;
-  }).then(function () {
-    loaded = true;
-    load.style.display = 'none';
-    img.style.display = 'block';
-    show(cur < 0 ? 0 : cur);
-  });
-
   Q.watch(function (i) { show(i); });
+  Q.beat(function () { return cur; });
+
+  setTimeout(function () {
+    if (!started) pg.textContent = '연결하는 중입니다. 잠시만 기다려 주세요';
+  }, 5000);
 })();
 </script>
 </body>
