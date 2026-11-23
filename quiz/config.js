@@ -22,15 +22,14 @@ window.QCONFIG = {
   COLLECTION: "yearend",
 
   /* 4) 이미지 장수 — 안내 1장 + 퀴즈 16장이면 17 */
-  IMAGE_COUNT: 5,
+  IMAGE_COUNT: 16,
 
   /* 5) 이미지 위치와 확장자 — 파일명은 00.jpg, 01.jpg … 형식입니다 */
   IMAGE_PATH: "images/",
   IMAGE_EXT: ".jpg",
 
-  /* 5-1) 이미지 판 번호 — 이미지를 교체할 때마다 이 숫자를 1씩 올려 주세요.
-          올리지 않으면 이미 접속했던 휴대폰이 예전 이미지를 계속 보여 줄 수 있습니다 */
-  IMAGE_VER: "2",
+  /* 5-1) 이미지 판 번호 — 이미지를 교체할 때마다 1씩 올려 주세요 */
+  IMAGE_VER: "3",
 
   /* 6) 참가자 주소 — 진행자 화면의 QR 코드에 쓰입니다 */
   PARTICIPANT_URL: "https://chanrran.github.io/canmeeting-2026/quiz/",
