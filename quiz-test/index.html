@@ -143,8 +143,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=15"></script>
-<script src="app.js?v=15"></script>
+<script src="config.js?v=16"></script>
+<script src="app.js?v=16"></script>
 <script>
 (function () {
   'use strict';
@@ -280,6 +280,16 @@
   lname.onclick = function () { openSheet('me'); };
   E('back').onclick = function () { off--; paint(); };
   E('fwd').onclick = function () { off++; paint(); };
+
+  /* 진행자가 전체 지우기를 누르면 이 휴대폰에 저장된 이름도 함께 풀립니다 */
+  Q.onWipe = function (w) {
+    var last = 0;
+    try { last = Number(localStorage.getItem('qwipe') || 0); } catch (e) {}
+    if (w <= last) return;
+    try { localStorage.setItem('qwipe', String(w)); localStorage.removeItem('qname'); } catch (e) {}
+    Q.me = null; Q.myPicks = {};
+    paint();
+  };
 
   Q.keepAwake();
   Q.loadMine(paint);
