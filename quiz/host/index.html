@@ -71,15 +71,18 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=18"></script>
-<script src="../app.js?v=18"></script>
+<script src="../key.js?v=19"></script>
+<script src="../config.js?v=19"></script>
+<script src="../app.js?v=19"></script>
 <script>
 (function () {
   'use strict';
   var root = document.getElementById('root');
 
   /* 정답표는 저장소에 두지 않습니다. 이 기기에만 저장합니다. */
-  try { window.QKEY = JSON.parse(localStorage.getItem('qkey') || 'null') || null; } catch (e) { window.QKEY = null; }
+  if (!window.QKEY) {
+    try { window.QKEY = JSON.parse(localStorage.getItem('qkey') || 'null') || null; } catch (e) { window.QKEY = null; }
+  }
   function keyCount() { var n = 0; for (var i = 1; i <= 16; i++) if (window.QKEY && window.QKEY[i]) n++; return n; }
 
   var G = Q.groups();
