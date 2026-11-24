@@ -17,8 +17,9 @@
   /* ---------------- 묶음 ---------------- */
   var G = C.GROUPS || [];
   Q.groups = function () { return G; };
-  Q.groupCount = function () { return G.length; };
-  Q.group = function (gi) { return G[Q.clampG(gi)] || []; };
+  Q.isRank = function (gi) { return G[Q.clampG(gi)] === 'RANK'; };
+  Q.isFinalRank = function (gi) { return Q.isRank(gi) && Q.clampG(gi) === G.length - 1; };
+  Q.group = function (gi) { var g = G[Q.clampG(gi)]; return (g && g.length && g !== 'RANK') ? g : []; };
   Q.clampG = function (gi) {
     gi = Number(gi);
     if (!isFinite(gi)) gi = 0;
@@ -27,19 +28,20 @@
     if (gi > G.length - 1) gi = G.length - 1;
     return gi;
   };
-  /* 그 묶음이 몇 번 문제인지 (표지·종료는 0) */
-  Q.quizNo = function (gi) {
-    var n = 0;
-    for (var i = 0; i <= Q.clampG(gi); i++) {
-      if (G[i].length && G[i][0] !== 0 && G[i][0] !== C.IMAGE_COUNT - 1) n++;
-    }
-    return (G[Q.clampG(gi)][0] === 0 || G[Q.clampG(gi)][0] === C.IMAGE_COUNT - 1) ? 0 : n;
+  Q.isQuizGroup = function (gi) {
+    var g = Q.group(gi);
+    return g.length > 0 && g[0] !== 0 && g[0] !== C.IMAGE_COUNT - 1;
   };
-  /* 그 묶음이 다루는 문제 번호들 (예: [6, 7]) */
-  Q.labels = function (gi) {
-    return Q.group(gi).map(function (idx) { return idx; })
-      .filter(function (idx) { return idx > 0 && idx < C.IMAGE_COUNT - 1; })
-      .map(function (idx) { return idx; });
+  Q.quizTotal = function () {
+    var n = 0;
+    for (var i = 0; i < G.length; i++) if (Q.isQuizGroup(i)) n++;
+    return n;
+  };
+  Q.quizNo = function (gi) {
+    if (!Q.isQuizGroup(gi)) return 0;
+    var n = 0;
+    for (var i = 0; i <= Q.clampG(gi); i++) if (Q.isQuizGroup(i)) n++;
+    return n;
   };
 
   Q.count = function () { return Math.max(1, Number(C.IMAGE_COUNT) || 1); };
