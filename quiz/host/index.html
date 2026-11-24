@@ -52,13 +52,6 @@
   .qr { display:flex; gap:14px; align-items:center; margin-top:10px; }
   .qr img { width:124px; height:124px; border:1px solid var(--line); border-radius:8px; background:#fff; }
   .qr .u { font-size:13px; word-break:break-all; color:#44444a; line-height:1.7; }
-  .keybox { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
-  .keybox textarea { width:100%; height:150px; font:inherit; font-size:14px; line-height:1.7;
-        border:1px solid var(--line); border-radius:8px; padding:10px; resize:vertical; }
-  .keybox .st { font-size:14px; margin-bottom:8px; }
-  .keybox .ok { color:#2e6b3f; font-weight:700; }
-  .keybox .no { color:#B42318; font-weight:700; }
-  .keybox button { padding:11px 18px; font-size:15px; margin-top:8px; margin-right:8px; }
   .netbar { position:fixed; top:0; left:0; right:0; z-index:10; background:#8a6a3b; color:#fff;
             font-size:13px; text-align:center; padding:6px 10px; display:none; }
   @media (max-width: 900px) { .main { grid-template-columns:1fr; } .glist { grid-template-columns:repeat(3,1fr); } }
@@ -71,19 +64,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../key.js?v=19"></script>
-<script src="../config.js?v=19"></script>
-<script src="../app.js?v=19"></script>
+<script src="../key.js?v=20"></script>
+<script src="../config.js?v=20"></script>
+<script src="../app.js?v=20"></script>
 <script>
 (function () {
   'use strict';
   var root = document.getElementById('root');
 
-  /* 정답표는 저장소에 두지 않습니다. 이 기기에만 저장합니다. */
-  if (!window.QKEY) {
-    try { window.QKEY = JSON.parse(localStorage.getItem('qkey') || 'null') || null; } catch (e) { window.QKEY = null; }
-  }
-  function keyCount() { var n = 0; for (var i = 1; i <= 16; i++) if (window.QKEY && window.QKEY[i]) n++; return n; }
 
   var G = Q.groups();
   var gi = 0;
@@ -109,7 +97,6 @@
 
   root.innerHTML =
     '<h1>' + QCONFIG.TITLE + '<span>진행자 화면</span></h1>' +
-    '<div class="keybox" id="keybox"></div>' +
     '<div class="main">' +
       '<div class="card">' +
         '<div class="lbl">지금 모두가 보고 있는 문제</div>' +
@@ -146,36 +133,6 @@
       '<div class="lbl">바로 가기</div>' +
       '<div class="glist" id="glist">' + glist + '</div>' +
     '</div>';
-
-  var keybox = document.getElementById('keybox');
-  function paintKey() {
-    var n = keyCount();
-    if (n === 16) {
-      keybox.innerHTML = '<div class="st"><span class="ok">정답표가 이 기기에 저장되어 있습니다</span> · 16문제</div>' +
-                         '<button id="kedit">다시 입력</button>';
-      document.getElementById('kedit').onclick = function () { window.QKEY = null; paintKey(); };
-      return;
-    }
-    keybox.innerHTML =
-      '<div class="st"><span class="no">정답표를 먼저 넣어 주세요</span> · ' +
-      '1번부터 16번까지 이름을 한 줄에 하나씩 붙여넣고 저장을 누르세요. ' +
-      '이 기기에만 저장되며 참가자에게는 전달되지 않습니다.</div>' +
-      '<textarea id="ktext" placeholder="태호&#10;가은&#10;승훈&#10;..."></textarea>' +
-      '<button id="ksave">저장</button>';
-    document.getElementById('ksave').onclick = function () {
-      var lines = document.getElementById('ktext').value.split('\n')
-        .map(function (x) { return x.trim(); }).filter(function (x) { return x; });
-      if (lines.length !== 16) { alert('16줄이어야 합니다. 지금 ' + lines.length + '줄입니다.'); return; }
-      var bad = lines.filter(function (x) { return QCONFIG.NAMES.indexOf(x) < 0; });
-      if (bad.length) { alert('명단에 없는 이름: ' + bad.join(', ')); return; }
-      var k = {};
-      lines.forEach(function (x, i) { k[i + 1] = x; });
-      window.QKEY = k;
-      try { localStorage.setItem('qkey', JSON.stringify(k)); } catch (e) {}
-      paintKey(); paint();
-    };
-  }
-  paintKey();
 
   var shots = document.getElementById('shots');
   var nxt = document.getElementById('nxt');
@@ -244,7 +201,7 @@
     var g = Q.group(gi);
     var off = !Q.isQuizGroup(gi);
     revBtn.disabled = off;
-    revBtn.disabled = off || !!revMap[gi] || keyCount() !== 16;
+    revBtn.disabled = off || !!revMap[gi] || !window.QKEY;
     revBtn.textContent = (!off && revMap[gi]) ? '정답이 공개되었습니다' : '정답 공개';
     revBtn.style.background = (!off && revMap[gi]) ? '#2e6b3f' : '#fff';
     revBtn.style.color = (!off && revMap[gi]) ? '#fff' : '#1b1b1f';
