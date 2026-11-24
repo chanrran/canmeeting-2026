@@ -6,106 +6,292 @@
 <meta name="theme-color" content="#000000">
 <title>2026 송년회 퀴즈</title>
 <style>
-  * { box-sizing: border-box; }
-  html, body {
-    margin:0; padding:0; height:100%;
-    background:#000; color:#fff; overflow:hidden;
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; height:100%; background:#000; color:#fff; overflow:hidden;
     font-family:-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    -webkit-tap-highlight-color: transparent;
-  }
-  #wrap { position:fixed; inset:0; width:100vw; height:100vh; height:100dvh;
-          display:flex; align-items:center; justify-content:center; }
-  #shot { max-width:100%; max-height:100%; width:auto; height:auto;
-          object-fit:contain; display:none; user-select:none; -webkit-user-drag:none; }
+    -webkit-tap-highlight-color:transparent; }
+  #app { position:fixed; inset:0; display:flex; flex-direction:column; }
+  #stage { position:relative; }
+  #stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+  /* 틀이 이미지가 그려진 실제 크기에 딱 맞아야 덧붙인 버튼이 제자리에 옵니다 */
+  #frame { position:relative; display:none; line-height:0; max-width:100%; max-height:100%; }
+  #shot { display:block; width:auto; height:auto; max-width:100%; max-height:100%;
+          user-select:none; -webkit-user-drag:none; }
+  /* 이미지는 90도 돌려 저장되어 있습니다. 덧붙이는 상자도 같이 돌려서
+     휴대폰을 눕혔을 때 글자가 바로 읽히게 합니다. */
+  #land { position:absolute; top:50%; left:50%;
+          width:calc(100% * 16 / 9); height:calc(100% * 9 / 16);
+          transform:translate(-50%, -50%) rotate(90deg); pointer-events:none; }
+  #obox { position:absolute; right:3%; bottom:2.5%;
+          width:11%; pointer-events:auto;
+          background:rgba(255,255,255,.95); border:1.5px solid #1b1b1f; border-radius:8px;
+          padding:5px 3px; text-align:center; color:#1b1b1f;
+          font:inherit; font-weight:700; }
+  #lnav { position:absolute; left:50%; bottom:3.5%; transform:translateX(-50%);
+          display:none; align-items:center; gap:8px; pointer-events:auto; }
+  #lnav button { font:inherit; font-size:13px; font-weight:700; color:#fff;
+          background:rgba(20,20,24,.86); border:1px solid rgba(255,255,255,.28);
+          border-radius:999px; padding:8px 16px; touch-action:manipulation; }
+  #lnav button:disabled { opacity:.32; }
+  #lnav span { font-size:12px; font-weight:700; color:#1b1b1f;
+          background:rgba(255,255,255,.92); border-radius:999px; padding:7px 11px; }
+  #lname { position:absolute; left:50%; bottom:7%; transform:translateX(-50%);
+          display:none; pointer-events:auto; font:inherit; font-weight:700; font-size:17px;
+          color:#fff; background:#1b1b1f; border:2px solid #1b1b1f; border-radius:12px;
+          padding:14px 26px; touch-action:manipulation; }
+  #lname.done { background:rgba(255,255,255,.95); color:#1b1b1f; }
+  #lname small { display:block; font-size:11px; font-weight:600; color:#a79069; margin-bottom:3px; }
+  #obox .t { font-size:8.5px; color:#8a6a3b; letter-spacing:0; margin-bottom:2px; }
+  #obox .v { font-size:12px; line-height:1.25; }
+  #obox.done { background:rgba(236,246,235,.97); border-color:#3f6b33; }
+  #obox.ok { background:rgba(224,244,220,.97); border-color:#2e6b3f; }
+  #obox.no { background:rgba(250,228,228,.97); border-color:#a33; }
+  #obox.self { background:rgba(250,243,226,.97); border-color:#8a6a3b; }
   #load { text-align:center; color:#8a8a90; font-size:15px; line-height:2; padding:0 24px; }
   #load b { display:block; color:#fff; font-size:17px; font-weight:600; margin-bottom:6px; }
 
-  /* 묶음 안에서만 쓰는 이동 버튼 — 한 장짜리 문제에서는 나오지 않습니다 */
-  #nav { position:fixed; left:0; right:0; bottom:0; display:none;
-         justify-content:center; align-items:center; gap:10px;
-         padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-         background:linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,0)); z-index:5; }
-  #nav button { font:inherit; font-size:15px; font-weight:600; color:#fff;
-                background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3);
-                border-radius:999px; padding:11px 20px; touch-action:manipulation; }
-  #nav button:disabled { opacity:.3; }
-  #cnt { font-size:14px; color:#d6d6da; min-width:46px; text-align:center; }
-  .netbar { position:fixed; top:0; left:0; right:0; z-index:10;
-            background:#8a6a3b; color:#fff; font-size:13px; text-align:center;
-            padding:6px 10px; display:none; }
+  #bar { flex:none; padding:9px 10px calc(9px + env(safe-area-inset-bottom));
+         background:#121214; border-top:1px solid #26262b; display:none; }
+  .navrow { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:8px; }
+  .navrow button { font:inherit; font-size:14px; font-weight:600; color:#fff;
+       background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.24);
+       border-radius:999px; padding:9px 18px; touch-action:manipulation; }
+  .navrow button:disabled { opacity:.3; }
+  .navrow span { font-size:13px; color:#b6b6bc; min-width:42px; text-align:center; }
+  .picks { display:flex; gap:7px; }
+  .pk { flex:1; font:inherit; font-size:15px; font-weight:600; color:#fff; text-align:center;
+        background:#23232a; border:1px solid #3a3a44; border-radius:10px;
+        padding:13px 6px; touch-action:manipulation; line-height:1.3; }
+  .pk b { display:block; font-size:11px; font-weight:600; color:#a79069; margin-bottom:3px; }
+  .pk.done { background:#2a2f27; border-color:#4a5a41; }
+  .pk.ok { background:#20351f; border-color:#4b7a42; }
+  .pk.no { background:#3a2020; border-color:#7a4242; }
+  .pk.self { background:#2b2720; border-color:#5a4c33; color:#e4cf9f; }
+  .pk:disabled { opacity:.95; }
+
+  #sheet { position:fixed; inset:0; background:rgba(0,0,0,.94); z-index:20; display:none; }
+  #sheetland { position:absolute; inset:0; display:flex; flex-direction:column;
+               padding:16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  #sheet.land #sheetland { inset:auto; top:50%; left:50%; width:100vh; height:100vw;
+               transform:translate(-50%, -50%) rotate(90deg); padding:14px 18px; }
+  #sheet h2 { font-size:16px; margin:4px 0 12px; font-weight:700; }
+  #sheet .grid { flex:1; overflow:auto; display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; align-content:start; }
+  #sheet.land .grid { grid-template-columns:repeat(4, 1fr); }
+  #sheet .grid button { font:inherit; font-size:16px; font-weight:600; color:#fff; background:#1d1d23;
+       border:1px solid #35353e; border-radius:10px; padding:16px 6px; touch-action:manipulation; }
+  #sheet .grid button.on { background:#8a6a3b; border-color:#b08c50; }
+  #sheet .grid button.busy { opacity:.33; }
+  #sheet .grid button span { display:block; font-size:10px; font-weight:600;
+        color:#a79069; margin-top:3px; }
+  #sheet .close { margin:10px auto 0; align-self:center; font:inherit; font-size:15px;
+       font-weight:600; color:#c9c9d0; background:#1d1d23; border:1px solid #35353e;
+       border-radius:10px; padding:13px 44px; }
+
+  #namepage { position:absolute; inset:0; display:none; }
+  #npland { position:absolute; top:50%; left:50%; width:100vh; height:100vw;
+            transform:translate(-50%, -50%) rotate(90deg);
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            padding:20px 40px; text-align:center; }
+  #npland h2 { font-size:22px; margin:0 0 8px; font-weight:700; }
+  #npland p { font-size:14px; color:#9a9aa2; margin:0 0 24px; line-height:1.8; }
+  #npland button { font:inherit; font-size:21px; font-weight:700; color:#1b1b1f;
+        background:#fff; border:none; border-radius:14px; padding:18px 44px;
+        min-width:240px; touch-action:manipulation; }
+  #npland .ok { font-size:14px; color:#9ad0a0; margin-top:16px; line-height:1.8; }
+  #rank { position:absolute; inset:0; display:none; }
+  #rkland { position:absolute; top:50%; left:50%; width:100vh; height:100vw;
+            transform:translate(-50%, -50%) rotate(90deg);
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            padding:16px 30px; text-align:center; }
+  #rkland h2 { font-size:15px; color:#a79069; letter-spacing:.12em; margin:0 0 14px; font-weight:700; }
+  #rkland .tops { display:flex; gap:12px; justify-content:center; }
+  #rkland .top { background:#16161a; border:1px solid #2c2c33; border-radius:14px;
+                 padding:16px 26px; min-width:132px; }
+  #rkland .top .n { font-size:12px; color:#a79069; margin-bottom:4px; }
+  #rkland .top .w { font-size:28px; font-weight:700; line-height:1.2; }
+  #rkland .top .s { font-size:13px; color:#9a9aa2; margin-top:4px; }
+  #rkland .mine { margin-top:16px; font-size:15px; color:#d6d6da; line-height:1.7; }
+  #rkland .mine b { font-size:22px; color:#fff; }
+  .netbar { position:fixed; top:0; left:0; right:0; z-index:30; background:#8a6a3b; color:#fff;
+            font-size:13px; text-align:center; padding:6px 10px; display:none; }
 </style>
 </head>
 <body>
 
-<div id="wrap">
-  <div id="load"><b>2026 송년회 퀴즈</b><span id="pg">화면을 준비하고 있습니다</span></div>
-  <img id="shot" alt="퀴즈 화면">
+<div id="app">
+  <div id="stage">
+    <div id="load"><b>2026 송년회 퀴즈</b><span id="pg">화면을 준비하고 있습니다</span></div>
+    <div id="frame">
+      <img id="shot" alt="퀴즈 화면">
+      <div id="land">
+        <button id="obox" type="button"></button>
+        <div id="lnav">
+          <button id="back" type="button">◀ 이전</button>
+          <span id="cnt"></span>
+          <button id="fwd" type="button">다음 ▶</button>
+        </div>
+        <button id="lname" type="button"></button>
+      </div>
+    </div>
+    <div id="namepage"></div>
+    <div id="rank"></div>
+  </div>
+  <div id="bar"></div>
 </div>
-<div id="nav">
-  <button id="back">◀ 이전</button>
-  <span id="cnt"></span>
-  <button id="fwd">다음 ▶</button>
-</div>
+<div id="sheet"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="config.js?v=14"></script>
+<script src="app.js?v=14"></script>
 <script>
 (function () {
   'use strict';
-  var img = document.getElementById('shot');
-  var load = document.getElementById('load');
-  var pg = document.getElementById('pg');
-  var nav = document.getElementById('nav');
-  var back = document.getElementById('back');
-  var fwd = document.getElementById('fwd');
-  var cnt = document.getElementById('cnt');
+  var E = function (id) { return document.getElementById(id); };
+  var img = E('shot'), load = E('load'), pg = E('pg'), bar = E('bar'),
+      sheet = E('sheet'), rank = E('rank'), frame = E('frame'), obox = E('obox'),
+      lnav = E('lnav'), lname = E('lname'), namepage = E('namepage');
+  var gi = 0, off = 0, started = false, revealed = {}, rows = [];
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) {
+    return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); };
 
-  var gi = 0, off = 0, started = false;
+  /* ---------- 이름 고르기 ---------- */
+  function openSheet(q) {
+    var names = Q.names();
+    var cur = (q === 'me') ? Q.me : Q.myPicks[q];
+    sheet.innerHTML = '<div id="sheetland"><h2>' + (q === 'me' ? '본인 이름을 골라 주세요'
+                       : q + '번은 누구일까요?') + '</h2><div class="grid">' +
+      names.map(function (n) {
+        var owner = (q === 'me') ? Q.taken[n] : null;
+        var busy = !!owner && owner !== Q.myId();
+        return '<button data-n="' + esc(n) + '"' +
+               (n === cur ? ' class="on"' : (busy ? ' class="busy" disabled' : '')) + '>' +
+               esc(n) + (busy ? '<span>이미 선택됨</span>' : '') + '</button>';
+      }).join('') + '</div><button class="close">닫기</button></div>';
+    sheet.className = 'land';
+    sheet.style.display = 'block';
+    sheet.querySelector('.close').onclick = function () { sheet.style.display = 'none'; };
+    sheet.querySelectorAll('.grid button').forEach(function (b) {
+      b.onclick = function () {
+        var n = b.getAttribute('data-n');
+        sheet.style.display = 'none';
+        if (q === 'me') { Q.setMe(n).then(paint); paint(); }
+        else { Q.pick(q, n); paint(); }
+      };
+    });
+  }
 
+  /* ---------- 그리기 ---------- */
   function paint() {
     var g = Q.group(gi);
     if (off > g.length - 1) off = g.length - 1;
     if (off < 0) off = 0;
-    img.src = Q.src(g[off]);
-    if (g.length > 1) {
-      nav.style.display = 'flex';
-      back.disabled = (off <= 0);
-      fwd.disabled = (off >= g.length - 1);
-      cnt.textContent = (off + 1) + ' / ' + g.length;
-    } else {
-      nav.style.display = 'none';
+
+    var isRank = Q.isRank(gi), isName = Q.isName(gi);
+    var isCover = (!isRank && g[0] === 0), isEnd = (!isRank && g[0] === Q.count() - 1);
+
+    if (!started) { started = true; load.style.display = 'none'; frame.style.display = 'inline-block'; Q.preloadAround(g[0]); }
+
+    if (isName) {
+      frame.style.display = 'none'; rank.style.display = 'none'; bar.style.display = 'none';
+      lnav.style.display = 'none'; namepage.style.display = 'block';
+      namepage.innerHTML = '<div id="npland"><h2>본인 이름을 골라 주세요</h2>' +
+        '<p>이 이름으로 점수가 쌓입니다. 잘못 고르면 다시 눌러 바꿀 수 있습니다.</p>' +
+        '<button id="np">' + (Q.me ? esc(Q.me) : '이름 고르기') + '</button>' +
+        (Q.me ? '<div class="ok">' + esc(Q.me) + '님으로 참여합니다</div>' : '') + '</div>';
+      E('np').onclick = function () { openSheet('me'); };
+      if (Q.onBeat) Q.onBeat();
+      return;
     }
-    if (!started) {
-      started = true;
-      load.style.display = 'none';
-      img.style.display = 'block';
-      Q.preloadAround(g[0]);
+    namepage.style.display = 'none';
+    if (isRank) { frame.style.display = 'none'; rank.style.display = 'block'; bar.style.display = 'none';
+                  lnav.style.display = 'none'; drawRank(); return; }
+    rank.style.display = 'none'; frame.style.display = 'inline-block';
+    img.src = Q.src(g[off]);
+
+    /* 이미지 오른쪽 여백의 이름 상자 — 지금 보고 있는 한 장에 대한 답입니다 */
+    var qn = g[off];
+    if (isCover || !Q.isQuiz(qn)) { obox.style.display = 'none'; }
+    else {
+      obox.style.display = 'block';
+      var a = Q.answer(qn), mine = Q.myPicks[qn], rev = !!revealed[gi], cls = '', v;
+      if (!Q.me) { v = '이름 먼저'; }
+      else if (a && a === Q.me) { cls = 'self'; v = '내 이야기'; }
+      else if (rev) { cls = (mine && mine === a) ? 'ok' : 'no'; v = (mine || '미응답') + '<br>정답 ' + a; }
+      else { v = mine || '고르기'; if (mine) cls = 'done'; }
+      obox.className = cls;
+      obox.innerHTML = '<div class="t">' + qn + '번은 누구?</div><div class="v">' + v + '</div>';
+      obox.disabled = (!Q.me || rev || (a && a === Q.me));
+      obox.onclick = function () { openSheet(qn); };
+    }
+
+    var html = '';
+    if (isCover) {
+      html = '';
+      lname.style.display = 'none';
+    } else {
+      lname.style.display = 'none';
+
+    }
+    bar.innerHTML = html;
+    bar.style.display = html ? 'block' : 'none';
+    if (E('me')) E('me').onclick = function () { openSheet('me'); };
+
+    if (!isCover && g.length > 1) {
+      lnav.style.display = 'flex';
+      E('back').disabled = (off <= 0);
+      E('fwd').disabled = (off >= g.length - 1);
+      E('cnt').textContent = (off + 1) + ' / ' + g.length;
+    } else {
+      lnav.style.display = 'none';
     }
     if (Q.onBeat) Q.onBeat();
   }
 
-  back.onclick = function () { off--; paint(); };
-  fwd.onclick = function () { off++; paint(); };
+  function drawRank() {
+    var fin = Q.isFinalRank(gi);
+    var ttl = fin ? '최종 순위' : '중간 순위';
+    if (!rows.length) {
+      rank.innerHTML = '<div id="rkland"><h2>' + ttl + '</h2>' +
+                       '<div class="mine">집계하는 중입니다</div></div>';
+      return;
+    }
+    var h = '<div id="rkland"><h2>' + ttl + '</h2><div class="tops">';
+    rows.slice(0, 2).forEach(function (r, i) {
+      h += '<div class="top"><div class="n">' + (i + 1) + '등</div><div class="w">' +
+           esc(r.name) + '</div><div class="s">' + r.score + '점</div></div>';
+    });
+    h += '</div>';
+    if (Q.me) {
+      var k = -1;
+      for (var i = 0; i < rows.length; i++) if (rows[i].name === Q.me) { k = i; break; }
+      if (k >= 0) h += '<div class="mine">' + esc(Q.me) + '님은 <b>' + (k + 1) + '등</b><br>' +
+                       rows[k].score + '점입니다</div>';
+    }
+    rank.innerHTML = h + '</div>';
+  }
 
   img.onerror = function () {
     var want = img.getAttribute('src');
     setTimeout(function () { if (img.getAttribute('src') === want) img.src = want; }, 1500);
   };
 
+  lname.onclick = function () { openSheet('me'); };
+  E('back').onclick = function () { off--; paint(); };
+  E('fwd').onclick = function () { off++; paint(); };
+
   Q.keepAwake();
-  Q.watch(function (g) {
-    if (g !== gi) off = 0;      /* 진행자가 묶음을 바꾸면 그 묶음의 첫 장으로 */
-    gi = g;
+  Q.loadMine(paint);
+  Q.watchAnswers(function (r) { rows = r; if (Q.isRank(gi)) drawRank(); });
+  Q.watch(function (g, d) {
+    if (g !== gi) off = 0;
+    gi = g; revealed = (d && d.rev) || {};
     paint();
   });
   Q.beat(function () { return gi; });
 
-  setTimeout(function () {
-    if (!started) pg.textContent = '연결하는 중입니다. 잠시만 기다려 주세요';
-  }, 5000);
+  setTimeout(function () { if (!started) pg.textContent = '연결하는 중입니다. 잠시만 기다려 주세요'; }, 5000);
 })();
 </script>
 </body>
