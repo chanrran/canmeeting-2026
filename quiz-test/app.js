@@ -97,6 +97,8 @@
     last = Date.now();
     Q.net(true);
     curG = Q.clampG(d && d.g || 0);
+    var w = Number((d && d.wipe) || 0);
+    if (w && Q.onWipe) Q.onWipe(w);
     if (cb) cb(curG, d || {});
   }
 
@@ -267,6 +269,24 @@
         fn(rows);
       }, function () {});
     });
+  };
+
+  /* 답안과 접속 기록을 지우고, 참가자 휴대폰에 저장된 이름까지 풀도록 신호를 보냅니다 */
+  Q.wipeAll = function () {
+    if (!db) return Promise.resolve();
+    return Q.clearAnswers()
+      .then(function () {
+        var s = db.collection(C.COLLECTION + '_live');
+        return s.get().then(function (snap) {
+          var b = db.batch();
+          snap.forEach(function (x) { b.delete(x.ref); });
+          return b.commit();
+        });
+      })
+      .then(function () {
+        return db.doc(DOC()).set({ wipe: Date.now(), updatedAt: Date.now() }, { merge: true });
+      })
+      .catch(function () { Q.net(false); });
   };
 
   Q.clearAnswers = function () {
