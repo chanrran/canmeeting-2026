@@ -11,6 +11,7 @@
     font-family:-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
     -webkit-tap-highlight-color:transparent; }
   #app { position:fixed; inset:0; display:flex; flex-direction:column; }
+  #stage { position:relative; }
   #stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
   /* 틀이 이미지가 그려진 실제 크기에 딱 맞아야 덧붙인 버튼이 제자리에 옵니다 */
   #frame { position:relative; display:none; line-height:0; max-width:100%; max-height:100%; }
@@ -82,13 +83,17 @@
   #sheet .close { margin-top:10px; font:inherit; font-size:15px; font-weight:600; color:#c9c9d0;
        background:#1d1d23; border:1px solid #35353e; border-radius:10px; padding:14px; }
 
-  #namepage { display:none; padding:30px 22px; text-align:center; }
-  #namepage h2 { font-size:20px; margin:0 0 8px; font-weight:700; }
-  #namepage p { font-size:14px; color:#9a9aa2; margin:0 0 26px; line-height:1.8; }
-  #namepage button { font:inherit; font-size:20px; font-weight:700; color:#1b1b1f;
-        background:#fff; border:none; border-radius:14px; padding:20px 30px; width:100%;
-        touch-action:manipulation; }
-  #namepage .ok { font-size:14px; color:#9ad0a0; margin-top:18px; line-height:1.8; }
+  #namepage { position:absolute; inset:0; display:none; }
+  #npland { position:absolute; top:50%; left:50%; width:100vh; height:100vw;
+            transform:translate(-50%, -50%) rotate(90deg);
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            padding:20px 40px; text-align:center; }
+  #npland h2 { font-size:22px; margin:0 0 8px; font-weight:700; }
+  #npland p { font-size:14px; color:#9a9aa2; margin:0 0 24px; line-height:1.8; }
+  #npland button { font:inherit; font-size:21px; font-weight:700; color:#1b1b1f;
+        background:#fff; border:none; border-radius:14px; padding:18px 44px;
+        min-width:240px; touch-action:manipulation; }
+  #npland .ok { font-size:14px; color:#9ad0a0; margin-top:16px; line-height:1.8; }
   #rank { display:none; padding:26px 20px; overflow:auto; text-align:center; }
   #rank h2 { font-size:15px; color:#a79069; letter-spacing:.1em; margin:0 0 18px; }
   #rank .top { background:#16161a; border:1px solid #2c2c33; border-radius:12px;
@@ -130,8 +135,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="config.js?v=10"></script>
+<script src="app.js?v=10"></script>
 <script>
 (function () {
   'use strict';
@@ -152,7 +157,7 @@
       names.map(function (n) {
         return '<button data-n="' + esc(n) + '"' + (n === cur ? ' class="on"' : '') + '>' + esc(n) + '</button>';
       }).join('') + '</div><button class="close">닫기</button></div>';
-    sheet.className = (q === 'me') ? '' : 'land';
+    sheet.className = 'land';
     sheet.style.display = 'block';
     sheet.querySelector('.close').onclick = function () { sheet.style.display = 'none'; };
     sheet.querySelectorAll('.grid button').forEach(function (b) {
@@ -179,10 +184,10 @@
     if (isName) {
       frame.style.display = 'none'; rank.style.display = 'none'; bar.style.display = 'none';
       lnav.style.display = 'none'; namepage.style.display = 'block';
-      namepage.innerHTML = '<h2>본인 이름을 골라 주세요</h2>' +
-        '<p>이 이름으로 점수가 쌓입니다.<br>잘못 고르면 다시 눌러 바꿀 수 있습니다.</p>' +
+      namepage.innerHTML = '<div id="npland"><h2>본인 이름을 골라 주세요</h2>' +
+        '<p>이 이름으로 점수가 쌓입니다. 잘못 고르면 다시 눌러 바꿀 수 있습니다.</p>' +
         '<button id="np">' + (Q.me ? esc(Q.me) : '이름 고르기') + '</button>' +
-        (Q.me ? '<div class="ok">' + esc(Q.me) + '님으로 참여합니다</div>' : '');
+        (Q.me ? '<div class="ok">' + esc(Q.me) + '님으로 참여합니다</div>' : '') + '</div>';
       E('np').onclick = function () { openSheet('me'); };
       if (Q.onBeat) Q.onBeat();
       return;
