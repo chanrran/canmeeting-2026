@@ -15,10 +15,14 @@
   .main { display:grid; grid-template-columns:1.35fr 1fr; gap:16px; align-items:start; }
   .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; }
   .lbl { font-size:12px; color:var(--gold); letter-spacing:.08em; margin-bottom:8px; }
-  .stage { background:#000; border-radius:8px; display:flex; align-items:center;
-           justify-content:center; height:46vh; min-height:260px; overflow:hidden; }
-  .stage img { max-width:100%; max-height:100%; object-fit:contain; }
-  .stage.next { height:26vh; min-height:150px; }
+  /* 이미지는 휴대폰용으로 90도 돌려 저장되어 있습니다.
+     진행자 화면에서는 보기 편하도록 가로로 되돌려 보여 줍니다. */
+  .stage { background:#000; border-radius:8px; position:relative;
+           aspect-ratio:16/9; overflow:hidden; }
+  .stage img { position:absolute; top:50%; left:50%;
+               width:calc(100% * 9 / 16); height:calc(100% * 16 / 9);
+               object-fit:contain;
+               transform:translate(-50%, -50%) rotate(-90deg); }
   .pos { font-size:26px; font-weight:700; margin-top:10px; }
   .pos small { font-size:14px; font-weight:400; color:#77777e; margin-left:6px; }
   .live { margin-top:8px; font-size:14px; }
@@ -34,16 +38,20 @@
   #next { background:var(--ink); color:#fff; border-color:var(--ink); }
   #first { padding:16px 18px; }
   .hint { font-size:12.5px; color:#77777e; margin-top:9px; }
-  .grid { display:grid; grid-template-columns:repeat(8, 1fr); gap:7px; margin-top:10px; }
-  .grid button { padding:0; border-radius:6px; overflow:hidden; background:#000; aspect-ratio:9/16; }
-  .grid img { width:100%; height:100%; object-fit:contain; display:block; }
+  .grid { display:grid; grid-template-columns:repeat(6, 1fr); gap:8px; margin-top:10px; }
+  .grid button { padding:0; border-radius:6px; overflow:hidden; background:#000;
+                 aspect-ratio:16/9; position:relative; }
+  .grid img { position:absolute; top:50%; left:50%; display:block;
+              width:calc(100% * 9 / 16); height:calc(100% * 16 / 9);
+              object-fit:contain;
+              transform:translate(-50%, -50%) rotate(-90deg); }
   .grid button.on { outline:3px solid var(--gold); outline-offset:-3px; }
   .qr { display:flex; gap:14px; align-items:center; margin-top:10px; }
   .qr img { width:124px; height:124px; border:1px solid var(--line); border-radius:8px; background:#fff; }
   .qr .u { font-size:13px; word-break:break-all; color:#44444a; line-height:1.7; }
   .netbar { position:fixed; top:0; left:0; right:0; z-index:10; background:#8a6a3b; color:#fff;
             font-size:13px; text-align:center; padding:6px 10px; display:none; }
-  @media (max-width: 880px) { .main { grid-template-columns:1fr; } .grid { grid-template-columns:repeat(6,1fr); } }
+  @media (max-width: 880px) { .main { grid-template-columns:1fr; } .grid { grid-template-columns:repeat(4,1fr); } }
 </style>
 </head>
 <body>
@@ -53,8 +61,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=8"></script>
-<script src="../app.js?v=8"></script>
+<script src="../config.js?v=9"></script>
+<script src="../app.js?v=9"></script>
 <script>
 (function () {
   'use strict';
