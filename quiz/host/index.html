@@ -5,53 +5,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>진행자 화면 · 송년회 퀴즈</title>
 <style>
-  * { box-sizing: border-box; }
+  * { box-sizing:border-box; }
   :root { --line:#e4e0d8; --gold:#8a6a3b; --ink:#1b1b1f; }
   body { margin:0; background:#f7f5f1; color:var(--ink);
          font-family:-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
-  .wrap { max-width:1120px; margin:0 auto; padding:18px 18px 40px; }
+  .wrap { max-width:1180px; margin:0 auto; padding:18px 18px 40px; }
   h1 { font-size:17px; margin:0 0 14px; }
   h1 span { color:var(--gold); font-weight:400; margin-left:8px; font-size:14px; }
-  .main { display:grid; grid-template-columns:1.35fr 1fr; gap:16px; align-items:start; }
+  .main { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; align-items:start; }
   .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; }
   .lbl { font-size:12px; color:var(--gold); letter-spacing:.08em; margin-bottom:8px; }
-  /* 이미지는 휴대폰용으로 90도 돌려 저장되어 있습니다.
-     진행자 화면에서는 보기 편하도록 가로로 되돌려 보여 줍니다. */
-  .stage { background:#000; border-radius:8px; position:relative;
-           aspect-ratio:16/9; overflow:hidden; }
+
+  /* 이미지는 휴대폰용으로 돌려 저장되어 있어 여기서는 가로로 되돌려 보여 줍니다 */
+  .shots { display:grid; gap:8px; }
+  .shots.n1 { grid-template-columns:1fr; }
+  .shots.n2 { grid-template-columns:1fr 1fr; }
+  .shots.n3 { grid-template-columns:1fr 1fr 1fr; }
+  .stage { background:#000; border-radius:8px; position:relative; aspect-ratio:16/9; overflow:hidden; }
   .stage img { position:absolute; top:50%; left:50%;
-               width:calc(100% * 9 / 16); height:calc(100% * 16 / 9);
-               object-fit:contain;
+               width:calc(100% * 9 / 16); height:calc(100% * 16 / 9); object-fit:contain;
                transform:translate(-50%, -50%) rotate(-90deg); }
-  .pos { font-size:26px; font-weight:700; margin-top:10px; }
-  .pos small { font-size:14px; font-weight:400; color:#77777e; margin-left:6px; }
+  .pos { font-size:24px; font-weight:700; margin-top:12px; }
+  .pos small { font-size:14px; font-weight:400; color:#77777e; margin-left:7px; }
   .live { margin-top:8px; font-size:14px; }
   .live b { font-size:17px; }
   .live .ok { color:#2e6b3f; }
   .live .wait { color:#b4601c; }
   .ctl { display:flex; gap:10px; margin-top:14px; }
   button { font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--line);
-           background:#fff; padding:16px 10px; font-size:17px; font-weight:600;
-           touch-action:manipulation; }
+           background:#fff; padding:16px 10px; font-size:17px; font-weight:600; touch-action:manipulation; }
   button:disabled { opacity:.35; cursor:default; }
   #prev, #next { flex:1; }
   #next { background:var(--ink); color:#fff; border-color:var(--ink); }
   #first { padding:16px 18px; }
   .hint { font-size:12.5px; color:#77777e; margin-top:9px; }
-  .grid { display:grid; grid-template-columns:repeat(6, 1fr); gap:8px; margin-top:10px; }
-  .grid button { padding:0; border-radius:6px; overflow:hidden; background:#000;
-                 aspect-ratio:16/9; position:relative; }
-  .grid img { position:absolute; top:50%; left:50%; display:block;
-              width:calc(100% * 9 / 16); height:calc(100% * 16 / 9);
-              object-fit:contain;
-              transform:translate(-50%, -50%) rotate(-90deg); }
-  .grid button.on { outline:3px solid var(--gold); outline-offset:-3px; }
+  .glist { display:grid; grid-template-columns:repeat(4, 1fr); gap:9px; margin-top:10px; }
+  .gbtn { padding:0; border-radius:8px; overflow:hidden; background:#fff; border:1px solid var(--line);
+          display:flex; flex-direction:column; }
+  .gbtn .t { font-size:13px; font-weight:700; padding:7px 4px; }
+  .gbtn .ims { display:flex; gap:2px; padding:0 4px 5px; }
+  .gbtn .im { flex:1; background:#000; border-radius:4px; position:relative; aspect-ratio:16/9; overflow:hidden; }
+  .gbtn .im img { position:absolute; top:50%; left:50%;
+                  width:calc(100% * 9 / 16); height:calc(100% * 16 / 9); object-fit:contain;
+                  transform:translate(-50%, -50%) rotate(-90deg); }
+  .gbtn.on { outline:3px solid var(--gold); outline-offset:-2px; }
   .qr { display:flex; gap:14px; align-items:center; margin-top:10px; }
   .qr img { width:124px; height:124px; border:1px solid var(--line); border-radius:8px; background:#fff; }
   .qr .u { font-size:13px; word-break:break-all; color:#44444a; line-height:1.7; }
   .netbar { position:fixed; top:0; left:0; right:0; z-index:10; background:#8a6a3b; color:#fff;
             font-size:13px; text-align:center; padding:6px 10px; display:none; }
-  @media (max-width: 880px) { .main { grid-template-columns:1fr; } .grid { grid-template-columns:repeat(4,1fr); } }
+  @media (max-width: 900px) { .main { grid-template-columns:1fr; } .glist { grid-template-columns:repeat(3,1fr); } }
 </style>
 </head>
 <body>
@@ -61,49 +64,54 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=9"></script>
-<script src="../app.js?v=9"></script>
+<script src="../config.js?v=10"></script>
+<script src="../app.js?v=10"></script>
 <script>
 (function () {
   'use strict';
   var root = document.getElementById('root');
-
-  /* 암호 없이 바로 들어옵니다. 다시 걸고 싶으면 아래 주석을 풀어 주세요.
-  var key = new URLSearchParams(location.search).get('key');
-  if (key !== QCONFIG.ADMIN_KEY) {
-    root.innerHTML = '진행자 화면입니다. 주소 끝에 ?key=암호 를 붙여 주세요.';
-    return;
-  } */
-
-  var N = Q.count();
-  var cur = 0;
+  var G = Q.groups();
+  var LAST = Q.count() - 1;
+  var gi = 0;
   var PURL = QCONFIG.PARTICIPANT_URL;
   var QR = Q.qrDataUrl(PURL);
 
-  var thumbs = '';
-  for (var i = 0; i < N; i++) {
-    thumbs += '<button data-go="' + i + '" title="' + (i + 1) + '번"><img src="' + Q.src(i) + '" alt=""></button>';
+  function title(k) {
+    var g = G[k];
+    if (g[0] === 0) return '표지';
+    if (g[0] === LAST) return '종료';
+    return g.map(function (x) { return x; }).join(', ') + '번';
+  }
+
+  var glist = '';
+  for (var k = 0; k < G.length; k++) {
+    var ims = G[k].map(function (x) {
+      return '<span class="im"><img src="' + Q.src(x) + '" alt=""></span>';
+    }).join('');
+    glist += '<button class="gbtn" data-g="' + k + '"><span class="t">' + title(k) +
+             '</span><span class="ims">' + ims + '</span></button>';
   }
 
   root.innerHTML =
     '<h1>' + QCONFIG.TITLE + '<span>진행자 화면</span></h1>' +
     '<div class="main">' +
       '<div class="card">' +
-        '<div class="lbl">지금 모두가 보고 있는 화면</div>' +
-        '<div class="stage"><img id="now" alt=""></div>' +
+        '<div class="lbl">지금 모두가 보고 있는 문제</div>' +
+        '<div class="shots" id="shots"></div>' +
         '<div class="pos"><span id="pos"></span><small id="posn"></small></div>' +
         '<div class="live" id="live">접속 현황을 확인하는 중입니다</div>' +
         '<div class="ctl">' +
-          '<button id="prev">◀ 이전</button>' +
-          '<button id="next">다음 ▶</button>' +
+          '<button id="prev">◀ 이전 문제</button>' +
+          '<button id="next">다음 문제 ▶</button>' +
           '<button id="first">처음으로</button>' +
         '</div>' +
-        '<div class="hint">키보드 왼쪽·오른쪽 화살표와 스페이스바로도 넘길 수 있습니다.</div>' +
+        '<div class="hint">키보드 왼쪽·오른쪽 화살표와 스페이스바로도 넘길 수 있습니다. ' +
+        '두 장 이상인 문제는 참가자가 직접 앞뒤로 넘겨 봅니다.</div>' +
       '</div>' +
       '<div>' +
         '<div class="card">' +
-          '<div class="lbl">다음에 나올 화면</div>' +
-          '<div class="stage next"><img id="nxt" alt=""></div>' +
+          '<div class="lbl">다음에 나올 문제</div>' +
+          '<div class="shots n1" id="nxt"></div>' +
         '</div>' +
         '<div class="card" style="margin-top:14px">' +
           '<div class="lbl">참가자 접속 주소</div>' +
@@ -114,56 +122,69 @@
     '</div>' +
     '<div class="card" style="margin-top:14px">' +
       '<div class="lbl">바로 가기</div>' +
-      '<div class="grid" id="grid">' + thumbs + '</div>' +
+      '<div class="glist" id="glist">' + glist + '</div>' +
     '</div>';
 
-  var now = document.getElementById('now');
+  var shots = document.getElementById('shots');
   var nxt = document.getElementById('nxt');
   var pos = document.getElementById('pos');
   var posn = document.getElementById('posn');
-  var grid = document.getElementById('grid');
+  var glistEl = document.getElementById('glist');
+
+  function fill(el, k) {
+    var g = G[k] || [];
+    el.className = 'shots n' + Math.min(3, g.length);
+    el.innerHTML = g.map(function (x) {
+      return '<div class="stage"><img src="' + Q.src(x) + '" alt=""></div>';
+    }).join('');
+  }
 
   function paint() {
-    now.src = Q.src(cur);
-    if (cur + 1 < N) { nxt.style.display = 'block'; nxt.src = Q.src(cur + 1); }
-    else { nxt.style.display = 'none'; }
-    pos.textContent = (cur + 1);
-    posn.textContent = '/ ' + N + (cur === 0 ? ' · 표지' : (cur === N - 1 ? ' · 종료' : ' · ' + cur + '번 문제'));
-    document.getElementById('prev').disabled = (cur <= 0);
-    document.getElementById('next').disabled = (cur >= N - 1);
-    var bs = grid.querySelectorAll('button');
-    for (var i = 0; i < bs.length; i++) bs[i].className = (i === cur ? 'on' : '');
+    fill(shots, gi);
+    if (gi + 1 < G.length) { nxt.parentElement.style.display = ''; fill(nxt, gi + 1); }
+    else { nxt.parentElement.style.display = 'none'; }
+    var g = G[gi];
+    if (g[0] === 0) { pos.textContent = '표지'; posn.textContent = ''; }
+    else if (g[0] === LAST) { pos.textContent = '종료'; posn.textContent = ''; }
+    else {
+      pos.textContent = title(gi);
+      posn.textContent = '· 전체 ' + (G.length - 2) + '문제 중 ' + Q.quizNo(gi) + '번째' +
+                         (g.length > 1 ? ' · ' + g.length + '명을 한 번에' : '');
+    }
+    document.getElementById('prev').disabled = (gi <= 0);
+    document.getElementById('next').disabled = (gi >= G.length - 1);
+    var bs = glistEl.querySelectorAll('.gbtn');
+    for (var i = 0; i < bs.length; i++) bs[i].className = 'gbtn' + (i === gi ? ' on' : '');
   }
 
-  function go(i) {
-    i = Q.clamp(i);
-    if (i === cur) return;
-    cur = i; paint(); Q.setIndex(i);
+  function go(k) {
+    k = Q.clampG(k);
+    if (k === gi) return;
+    gi = k; paint(); Q.setGroup(k);
   }
 
-  document.getElementById('prev').onclick = function () { go(cur - 1); };
-  document.getElementById('next').onclick = function () { go(cur + 1); };
+  document.getElementById('prev').onclick = function () { go(gi - 1); };
+  document.getElementById('next').onclick = function () { go(gi + 1); };
   document.getElementById('first').onclick = function () { go(0); };
-  grid.onclick = function (ev) {
-    var b = ev.target.closest('button[data-go]');
-    if (b) go(Number(b.getAttribute('data-go')));
+  glistEl.onclick = function (ev) {
+    var b = ev.target.closest('.gbtn[data-g]');
+    if (b) go(Number(b.getAttribute('data-g')));
   };
   document.addEventListener('keydown', function (ev) {
-    if (ev.key === 'ArrowRight' || ev.key === ' ') { ev.preventDefault(); go(cur + 1); }
-    if (ev.key === 'ArrowLeft') { ev.preventDefault(); go(cur - 1); }
+    if (ev.key === 'ArrowRight' || ev.key === ' ') { ev.preventDefault(); go(gi + 1); }
+    if (ev.key === 'ArrowLeft') { ev.preventDefault(); go(gi - 1); }
   });
 
   Q.preloadAround(0);
-  Q.watch(function (i) { cur = i; paint(); });
+  Q.watch(function (k) { gi = k; paint(); });
   Q.ready.then(function () { Q.refresh(); Q.initIfMissing(); });
   Q.watchLive(function (on, same) {
     var el = document.getElementById('live');
     if (!on) { el.innerHTML = '아직 접속한 분이 없습니다'; return; }
     var behind = on - same;
     el.innerHTML = '접속 <b>' + on + '</b>명 · ' +
-      (behind === 0
-        ? '<span class="ok">모두 같은 화면입니다</span>'
-        : '<span class="wait">' + behind + '명이 아직 넘어오지 않았습니다</span>');
+      (behind === 0 ? '<span class="ok">모두 같은 문제입니다</span>'
+                    : '<span class="wait">' + behind + '명이 아직 넘어오지 않았습니다</span>');
   });
   paint();
 })();
