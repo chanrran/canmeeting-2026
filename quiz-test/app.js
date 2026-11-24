@@ -248,16 +248,21 @@
     return n;
   };
 
+  Q.taken = {};                     /* 이름 → 그 이름을 고른 기기 */
+  Q.myId = function () { return clientId(); };
+
   Q.watchAnswers = function (fn) {
     Q.ready.then(function () {
       if (!db) return;
       db.collection(ANS()).onSnapshot(function (snap) {
-        var rows = [];
+        var rows = [], taken = {};
         snap.forEach(function (d) {
           var v = d.data() || {};
           if (!v.name) return;
+          taken[v.name] = d.id;
           rows.push({ name: v.name, picks: v.picks || {}, at: v.at || 0, score: Q.scoreOf(v) });
         });
+        Q.taken = taken;
         rows.sort(function (a, b) { return b.score - a.score || a.at - b.at; });
         fn(rows);
       }, function () {});
