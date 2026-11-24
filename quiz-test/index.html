@@ -12,9 +12,9 @@
     -webkit-tap-highlight-color:transparent; }
   #app { position:fixed; inset:0; display:flex; flex-direction:column; }
   #stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
-  #frame { position:relative; aspect-ratio:9/16; height:100%; max-width:100%; max-height:100%;
-           margin:auto; display:none; }
-  #shot { width:100%; height:100%; object-fit:contain; display:block;
+  /* 틀이 이미지가 그려진 실제 크기에 딱 맞아야 덧붙인 버튼이 제자리에 옵니다 */
+  #frame { position:relative; display:none; line-height:0; max-width:100%; max-height:100%; }
+  #shot { display:block; width:auto; height:auto; max-width:100%; max-height:100%;
           user-select:none; -webkit-user-drag:none; }
   /* 이미지는 90도 돌려 저장되어 있습니다. 덧붙이는 상자도 같이 돌려서
      휴대폰을 눕혔을 때 글자가 바로 읽히게 합니다. */
@@ -120,8 +120,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="app.js?v=7"></script>
 <script>
 (function () {
   'use strict';
@@ -163,10 +163,10 @@
     var isRank = Q.isRank(gi);
     var isCover = (!isRank && g[0] === 0), isEnd = (!isRank && g[0] === Q.count() - 1);
 
-    if (!started) { started = true; load.style.display = 'none'; frame.style.display = 'block'; Q.preloadAround(g[0]); }
+    if (!started) { started = true; load.style.display = 'none'; frame.style.display = 'inline-block'; Q.preloadAround(g[0]); }
 
     if (isRank) { frame.style.display = 'none'; rank.style.display = 'block'; bar.style.display = 'none'; drawRank(); return; }
-    rank.style.display = 'none'; frame.style.display = 'block';
+    rank.style.display = 'none'; frame.style.display = 'inline-block';
     img.src = Q.src(g[off]);
 
     /* 이미지 오른쪽 여백의 이름 상자 — 지금 보고 있는 한 장에 대한 답입니다 */
