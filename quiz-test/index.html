@@ -95,16 +95,20 @@
         background:#fff; border:none; border-radius:14px; padding:18px 44px;
         min-width:240px; touch-action:manipulation; }
   #npland .ok { font-size:14px; color:#9ad0a0; margin-top:16px; line-height:1.8; }
-  #rank { display:none; padding:26px 20px; overflow:auto; text-align:center; }
-  #rank h2 { font-size:15px; color:#a79069; letter-spacing:.1em; margin:0 0 18px; }
-  #rank .top { background:#16161a; border:1px solid #2c2c33; border-radius:12px;
-               padding:18px; margin-bottom:10px; }
-  #rank .top .n { font-size:13px; color:#a79069; margin-bottom:5px; }
-  #rank .top .w { font-size:26px; font-weight:700; }
-  #rank .top .s { font-size:14px; color:#9a9aa2; margin-top:4px; }
-  #rank .mine { margin-top:16px; font-size:16px; color:#d6d6da; line-height:1.9; }
-  #rank .mine b { font-size:24px; color:#fff; }
-
+  #rank { position:absolute; inset:0; display:none; }
+  #rkland { position:absolute; top:50%; left:50%; width:100vh; height:100vw;
+            transform:translate(-50%, -50%) rotate(90deg);
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            padding:16px 30px; text-align:center; }
+  #rkland h2 { font-size:15px; color:#a79069; letter-spacing:.12em; margin:0 0 14px; font-weight:700; }
+  #rkland .tops { display:flex; gap:12px; justify-content:center; }
+  #rkland .top { background:#16161a; border:1px solid #2c2c33; border-radius:14px;
+                 padding:16px 26px; min-width:132px; }
+  #rkland .top .n { font-size:12px; color:#a79069; margin-bottom:4px; }
+  #rkland .top .w { font-size:28px; font-weight:700; line-height:1.2; }
+  #rkland .top .s { font-size:13px; color:#9a9aa2; margin-top:4px; }
+  #rkland .mine { margin-top:16px; font-size:15px; color:#d6d6da; line-height:1.7; }
+  #rkland .mine b { font-size:22px; color:#fff; }
   .netbar { position:fixed; top:0; left:0; right:0; z-index:30; background:#8a6a3b; color:#fff;
             font-size:13px; text-align:center; padding:6px 10px; display:none; }
 </style>
@@ -136,8 +140,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script src="config.js?v=12"></script>
+<script src="app.js?v=12"></script>
 <script>
 (function () {
   'use strict';
@@ -241,19 +245,24 @@
   function drawRank() {
     var fin = Q.isFinalRank(gi);
     var ttl = fin ? '최종 순위' : '중간 순위';
-    if (!rows.length) { rank.innerHTML = '<h2>' + ttl + '</h2><div class="mine">집계하는 중입니다</div>'; return; }
-    var h = '<h2>' + ttl + '</h2>';
+    if (!rows.length) {
+      rank.innerHTML = '<div id="rkland"><h2>' + ttl + '</h2>' +
+                       '<div class="mine">집계하는 중입니다</div></div>';
+      return;
+    }
+    var h = '<div id="rkland"><h2>' + ttl + '</h2><div class="tops">';
     rows.slice(0, fin ? 2 : 3).forEach(function (r, i) {
       h += '<div class="top"><div class="n">' + (i + 1) + '등</div><div class="w">' +
            esc(r.name) + '</div><div class="s">' + r.score + '점</div></div>';
     });
+    h += '</div>';
     if (Q.me) {
       var k = -1;
       for (var i = 0; i < rows.length; i++) if (rows[i].name === Q.me) { k = i; break; }
       if (k >= 0) h += '<div class="mine">' + esc(Q.me) + '님은 <b>' + (k + 1) + '등</b><br>' +
                        rows[k].score + '점입니다</div>';
     }
-    rank.innerHTML = h;
+    rank.innerHTML = h + '</div>';
   }
 
   img.onerror = function () {
