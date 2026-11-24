@@ -17,8 +17,10 @@
   /* ---------------- 묶음 ---------------- */
   var G = C.GROUPS || [];
   Q.groups = function () { return G; };
-  Q.groupCount = function () { return G.length; };
-  Q.group = function (gi) { return G[Q.clampG(gi)] || []; };
+  Q.isRank = function (gi) { return G[Q.clampG(gi)] === 'RANK'; };
+  Q.isName = function (gi) { return G[Q.clampG(gi)] === 'NAME'; };
+  Q.isFinalRank = function (gi) { return Q.isRank(gi) && Q.clampG(gi) === G.length - 1; };
+  Q.group = function (gi) { var g = G[Q.clampG(gi)]; return (Array.isArray(g) && g.length) ? g : []; };
   Q.clampG = function (gi) {
     gi = Number(gi);
     if (!isFinite(gi)) gi = 0;
@@ -27,19 +29,20 @@
     if (gi > G.length - 1) gi = G.length - 1;
     return gi;
   };
-  /* 그 묶음이 몇 번 문제인지 (표지·종료는 0) */
-  Q.quizNo = function (gi) {
-    var n = 0;
-    for (var i = 0; i <= Q.clampG(gi); i++) {
-      if (G[i].length && G[i][0] !== 0 && G[i][0] !== C.IMAGE_COUNT - 1) n++;
-    }
-    return (G[Q.clampG(gi)][0] === 0 || G[Q.clampG(gi)][0] === C.IMAGE_COUNT - 1) ? 0 : n;
+  Q.isQuizGroup = function (gi) {
+    var g = Q.group(gi);
+    return g.length > 0 && g[0] !== 0 && g[0] !== C.IMAGE_COUNT - 1;
   };
-  /* 그 묶음이 다루는 문제 번호들 (예: [6, 7]) */
-  Q.labels = function (gi) {
-    return Q.group(gi).map(function (idx) { return idx; })
-      .filter(function (idx) { return idx > 0 && idx < C.IMAGE_COUNT - 1; })
-      .map(function (idx) { return idx; });
+  Q.quizTotal = function () {
+    var n = 0;
+    for (var i = 0; i < G.length; i++) if (Q.isQuizGroup(i)) n++;
+    return n;
+  };
+  Q.quizNo = function (gi) {
+    if (!Q.isQuizGroup(gi)) return 0;
+    var n = 0;
+    for (var i = 0; i <= Q.clampG(gi); i++) if (Q.isQuizGroup(i)) n++;
+    return n;
   };
 
   Q.count = function () { return Math.max(1, Number(C.IMAGE_COUNT) || 1); };
@@ -186,6 +189,102 @@
         fn(on, same);
       }, function () {});
     });
+  };
+
+
+  /* ---------------- 이름·정답·점수 ---------------- */
+  Q.names = function () { return C.NAMES || []; };
+  Q.answer = function (q) { return (C.ANSWERS || {})[q] || null; };
+  /* 문제 번호 = 이미지 번호 (1~16) */
+  Q.isQuiz = function (idx) { return idx > 0 && idx < Q.count() - 1; };
+
+  var ANS = function () { return C.COLLECTION + '_ans'; };
+
+  Q.me = null;
+  try { Q.me = localStorage.getItem('qname') || null; } catch (e) {}
+
+  Q.setMe = function (name) {
+    Q.me = name;
+    try { localStorage.setItem('qname', name); } catch (e) {}
+    if (!db) return Promise.resolve();
+    return db.collection(ANS()).doc(clientId())
+      .set({ name: name, at: Date.now() }, { merge: true }).catch(function () {});
+  };
+
+  Q.myPicks = {};
+  Q.loadMine = function (then) {
+    Q.ready.then(function () {
+      if (!db) return;
+      db.collection(ANS()).doc(clientId()).onSnapshot(function (s) {
+        var d = s.exists ? (s.data() || {}) : {};
+        Q.myPicks = d.picks || {};
+        if (d.name && !Q.me) { Q.me = d.name; try { localStorage.setItem('qname', d.name); } catch (e) {} }
+        if (then) then();
+      }, function () {});
+    });
+  };
+
+  Q.pick = function (q, name) {
+    Q.myPicks[q] = name;
+    if (!db) return Promise.resolve();
+    var up = { name: Q.me, at: Date.now() };
+    up['picks.' + q] = name;
+    return db.collection(ANS()).doc(clientId()).set({ name: Q.me, at: Date.now() }, { merge: true })
+      .then(function () {
+        var o = {}; o['picks.' + q] = name; o.at = Date.now();
+        return db.collection(ANS()).doc(clientId()).update(o);
+      }).catch(function () { Q.net(false); });
+  };
+
+  /* 한 사람의 점수: 맞힌 사람 수. 본인 이야기는 자동으로 맞힌 것으로 칩니다 */
+  Q.scoreOf = function (d) {
+    var picks = d.picks || {}, n = 0;
+    for (var q = 1; q <= Q.count() - 2; q++) {
+      var a = Q.answer(q);
+      if (!a) continue;
+      if (d.name && a === d.name) { n++; continue; }
+      if (picks[q] && picks[q] === a) n++;
+    }
+    return n;
+  };
+
+  Q.taken = {};                     /* 이름 → 그 이름을 고른 기기 */
+  Q.myId = function () { return clientId(); };
+
+  Q.watchAnswers = function (fn) {
+    Q.ready.then(function () {
+      if (!db) return;
+      db.collection(ANS()).onSnapshot(function (snap) {
+        var rows = [], taken = {};
+        snap.forEach(function (d) {
+          var v = d.data() || {};
+          if (!v.name) return;
+          taken[v.name] = d.id;
+          rows.push({ name: v.name, picks: v.picks || {}, at: v.at || 0, score: Q.scoreOf(v) });
+        });
+        Q.taken = taken;
+        rows.sort(function (a, b) { return b.score - a.score || a.at - b.at; });
+        fn(rows);
+      }, function () {});
+    });
+  };
+
+  Q.clearAnswers = function () {
+    if (!db) return Promise.resolve();
+    return db.collection(ANS()).get().then(function (snap) {
+      var b = db.batch();
+      snap.forEach(function (d) { b.delete(d.ref); });
+      return b.commit();
+    }).catch(function () {});
+  };
+
+  /* 정답 공개 상태 — 진행자가 묶음별로 켭니다 */
+  Q.setReveal = function (gi, on) {
+    if (!db) return Promise.resolve();
+    var o = {}; o['rev.' + gi] = !!on; o.updatedAt = Date.now();
+    return db.doc(DOC()).set({ rev: {} }, { merge: true })
+      .then(function () { return db.doc(DOC()).update(o); })
+      .catch(function () { Q.net(false); });
   };
 
   /* ---------------- 이미지 미리 받기 ---------------- */
