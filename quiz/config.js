@@ -21,15 +21,15 @@ window.QCONFIG = {
   /* 3) 자료를 담는 칸 이름 — 캔미팅 자료와 섞이지 않게 하는 값입니다. 바꾸지 마세요 */
   COLLECTION: "yearend",
 
-  /* 4) 이미지 장수 — 안내 1장 + 퀴즈 16장이면 17 */
-  IMAGE_COUNT: 16,
+  /* 4) 이미지 장수 — 표지 1장 + 문제 16장 + 종료 1장 = 18 */
+  IMAGE_COUNT: 18,
 
   /* 5) 이미지 위치와 확장자 — 파일명은 00.jpg, 01.jpg … 형식입니다 */
   IMAGE_PATH: "images/",
   IMAGE_EXT: ".jpg",
 
   /* 5-1) 이미지 판 번호 — 이미지를 교체할 때마다 1씩 올려 주세요 */
-  IMAGE_VER: "3",
+  IMAGE_VER: "4",
 
   /* 6) 참가자 주소 — 진행자 화면의 QR 코드에 쓰입니다 */
   PARTICIPANT_URL: "https://chanrran.github.io/canmeeting-2026/quiz/",
