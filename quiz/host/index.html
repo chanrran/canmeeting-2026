@@ -64,14 +64,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=16"></script>
-<script src="../app.js?v=16"></script>
+<script src="../key.js?v=17"></script>
+<script src="../config.js?v=17"></script>
+<script src="../app.js?v=17"></script>
 <script>
 (function () {
   'use strict';
   var root = document.getElementById('root');
   var G = Q.groups();
-  var LAST = Q.count() - 1;
   var gi = 0;
   var PURL = QCONFIG.PARTICIPANT_URL;
   var QR = Q.qrDataUrl(PURL);
@@ -81,7 +81,6 @@
     if (Q.isName(k)) return '이름 고르기';
     var g = G[k];
     if (g[0] === 0) return '표지';
-    if (g[0] === LAST) return '종료';
     return g.join(', ') + '번';
   }
 
@@ -161,7 +160,6 @@
     var g = Q.group(gi);
     if (Q.isRank(gi) || Q.isName(gi)) { pos.textContent = title(gi); posn.textContent = ''; }
     else if (g[0] === 0) { pos.textContent = '표지'; posn.textContent = ''; }
-    else if (g[0] === LAST) { pos.textContent = '종료'; posn.textContent = ''; }
     else {
       pos.textContent = title(gi);
       posn.textContent = '· 전체 ' + Q.quizTotal() + '문제 중 ' + Q.quizNo(gi) + '번째' +
@@ -194,14 +192,15 @@
   var revMap = {};
   var revBtn = document.getElementById('rev');
   revBtn.onclick = function () {
-    if (!Q.isQuizGroup(gi)) return;
-    Q.setReveal(gi, !revMap[gi]);
+    if (!Q.isQuizGroup(gi) || revMap[gi]) return;
+    Q.reveal(gi);
   };
   function paintRev() {
     var g = Q.group(gi);
     var off = !Q.isQuizGroup(gi);
     revBtn.disabled = off;
-    revBtn.textContent = off ? '정답 공개' : (revMap[gi] ? '정답 숨기기' : '정답 공개');
+    revBtn.disabled = off || !!revMap[gi];
+    revBtn.textContent = (!off && revMap[gi]) ? '정답이 공개되었습니다' : '정답 공개';
     revBtn.style.background = (!off && revMap[gi]) ? '#2e6b3f' : '#fff';
     revBtn.style.color = (!off && revMap[gi]) ? '#fff' : '#1b1b1f';
   }
@@ -230,6 +229,7 @@
     el.innerHTML = rows.map(function (r, i) {
       return '<div>' + (i + 1) + '등 · <b>' + r.name + '</b> · ' + r.score + '점</div>';
     }).join('');
+    Q.publishBoard(rows);
   });
 
   Q.preloadAround(0);
