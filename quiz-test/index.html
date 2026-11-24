@@ -96,8 +96,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="config.js?v=4"></script>
+<script src="app.js?v=4"></script>
 <script>
 (function () {
   'use strict';
@@ -135,11 +135,12 @@
     if (off > g.length - 1) off = g.length - 1;
     if (off < 0) off = 0;
 
-    var isCover = (g[0] === 0), isEnd = (g[0] === Q.count() - 1);
+    var isRank = Q.isRank(gi);
+    var isCover = (!isRank && g[0] === 0), isEnd = (!isRank && g[0] === Q.count() - 1);
 
     if (!started) { started = true; load.style.display = 'none'; frame.style.display = 'block'; Q.preloadAround(g[0]); }
 
-    if (isEnd) { frame.style.display = 'none'; rank.style.display = 'block'; bar.style.display = 'none'; drawRank(); return; }
+    if (isRank) { frame.style.display = 'none'; rank.style.display = 'block'; bar.style.display = 'none'; drawRank(); return; }
     rank.style.display = 'none'; frame.style.display = 'block';
     img.src = Q.src(g[off]);
 
@@ -183,9 +184,11 @@
   }
 
   function drawRank() {
-    if (!rows.length) { rank.innerHTML = '<h2>결과</h2><div class="mine">집계하는 중입니다</div>'; return; }
-    var h = '<h2>최종 순위</h2>';
-    rows.slice(0, 2).forEach(function (r, i) {
+    var fin = Q.isFinalRank(gi);
+    var ttl = fin ? '최종 순위' : '중간 순위';
+    if (!rows.length) { rank.innerHTML = '<h2>' + ttl + '</h2><div class="mine">집계하는 중입니다</div>'; return; }
+    var h = '<h2>' + ttl + '</h2>';
+    rows.slice(0, fin ? 2 : 3).forEach(function (r, i) {
       h += '<div class="top"><div class="n">' + (i + 1) + '등</div><div class="w">' +
            esc(r.name) + '</div><div class="s">' + r.score + '점</div></div>';
     });
@@ -205,7 +208,7 @@
 
   Q.keepAwake();
   Q.loadMine(paint);
-  Q.watchAnswers(function (r) { rows = r; if (Q.group(gi)[0] === Q.count() - 1) drawRank(); });
+  Q.watchAnswers(function (r) { rows = r; if (Q.isRank(gi)) drawRank(); });
   Q.watch(function (g, d) {
     if (g !== gi) off = 0;
     gi = g; revealed = (d && d.rev) || {};
