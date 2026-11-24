@@ -64,8 +64,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=12"></script>
-<script src="../app.js?v=12"></script>
+<script src="../config.js?v=13"></script>
+<script src="../app.js?v=13"></script>
 <script>
 (function () {
   'use strict';
@@ -126,6 +126,7 @@
     '<div class="card" style="margin-top:14px">' +
       '<div class="lbl">점수판</div>' +
       '<div id="board" style="font-size:14px;line-height:2">집계하는 중입니다</div>' +
+      '<button id="reset" style="margin-top:10px;padding:10px 16px;font-size:14px">참가자와 점수 모두 지우기</button>' +
     '</div>' +
     '<div class="card" style="margin-top:14px">' +
       '<div class="lbl">바로 가기</div>' +
@@ -204,6 +205,25 @@
     revBtn.style.background = (!off && revMap[gi]) ? '#2e6b3f' : '#fff';
     revBtn.style.color = (!off && revMap[gi]) ? '#fff' : '#1b1b1f';
   }
+  var armed = false, rbtn = null;
+  setTimeout(function () {
+    rbtn = document.getElementById('reset');
+    if (!rbtn) return;
+    rbtn.onclick = function () {
+      if (!armed) { armed = true; rbtn.textContent = '정말 지웁니다. 한 번 더 누르세요';
+        rbtn.style.background = '#B42318'; rbtn.style.color = '#fff';
+        setTimeout(function () { armed = false; rbtn.textContent = '참가자와 점수 모두 지우기';
+          rbtn.style.background = '#fff'; rbtn.style.color = '#1b1b1f'; }, 4000);
+        return; }
+      armed = false;
+      rbtn.textContent = '지우는 중입니다';
+      Q.clearAnswers().then(function () {
+        rbtn.textContent = '참가자와 점수 모두 지우기';
+        rbtn.style.background = '#fff'; rbtn.style.color = '#1b1b1f';
+      });
+    };
+  }, 0);
+
   Q.watchAnswers(function (rows) {
     var el = document.getElementById('board');
     if (!rows.length) { el.innerHTML = '아직 참여한 분이 없습니다'; return; }
