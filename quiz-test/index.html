@@ -143,8 +143,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=16"></script>
-<script src="app.js?v=16"></script>
+<script src="config.js?v=17"></script>
+<script src="app.js?v=17"></script>
 <script>
 (function () {
   'use strict';
@@ -152,7 +152,7 @@
   var img = E('shot'), load = E('load'), pg = E('pg'), bar = E('bar'),
       sheet = E('sheet'), rank = E('rank'), frame = E('frame'), obox = E('obox'),
       lnav = E('lnav'), lname = E('lname'), namepage = E('namepage');
-  var gi = 0, off = 0, started = false, revealed = {}, rows = [];
+  var gi = 0, off = 0, started = false, revealed = {}, revAns = {}, rows = [];
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); };
 
@@ -215,14 +215,16 @@
     if (isCover || !Q.isQuiz(qn)) { obox.style.display = 'none'; }
     else {
       obox.style.display = 'block';
-      var a = Q.answer(qn), mine = Q.myPicks[qn], rev = !!revealed[gi], cls = '', v;
+      var mine = Q.myPicks[qn], rev = !!revealed[gi];
+      var a = rev ? ((revAns[gi] || {})[qn] || null) : null;   /* 정답은 공개된 뒤에만 내려옵니다 */
+      var cls = '', v;
       if (!Q.me) { v = '이름 먼저'; }
-      else if (a && a === Q.me) { cls = 'self'; v = '내 이야기'; }
-      else if (rev) { cls = (mine && mine === a) ? 'ok' : 'no'; v = (mine || '미응답') + '<br>정답 ' + a; }
+      else if (rev) { cls = (mine && a && mine === a) ? 'ok' : 'no';
+                      v = (mine || '미응답') + '<br>정답 ' + (a || '-'); }
       else { v = mine || '고르기'; if (mine) cls = 'done'; }
       obox.className = cls;
       obox.innerHTML = '<div class="v">' + v + '</div>';
-      obox.disabled = (!Q.me || rev || (a && a === Q.me));
+      obox.disabled = (!Q.me || rev);
       obox.onclick = function () { openSheet(qn); };
     }
 
@@ -293,10 +295,11 @@
 
   Q.keepAwake();
   Q.loadMine(paint);
-  Q.watchAnswers(function (r) { rows = r; if (Q.isRank(gi)) drawRank(); });
+  Q.watchAnswers(function () { paint(); });        /* 이미 쓰인 이름 확인용 */
+  Q.watchBoard(function (r) { rows = r; if (Q.isRank(gi)) drawRank(); });
   Q.watch(function (g, d) {
     if (g !== gi) off = 0;
-    gi = g; revealed = (d && d.rev) || {};
+    gi = g; revealed = (d && d.rev) || {}; revAns = (d && d.ans) || {};
     paint();
   });
   Q.beat(function () { return gi; });
