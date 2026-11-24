@@ -31,7 +31,7 @@
   };
   Q.isQuizGroup = function (gi) {
     var g = Q.group(gi);
-    return g.length > 0 && g[0] !== 0 && g[0] !== C.IMAGE_COUNT - 1;
+    return g.length > 0 && g[0] !== 0;
   };
   Q.quizTotal = function () {
     var n = 0;
@@ -196,9 +196,9 @@
 
   /* ---------------- 이름·정답·점수 ---------------- */
   Q.names = function () { return C.NAMES || []; };
-  Q.answer = function (q) { return (C.ANSWERS || {})[q] || null; };
+  Q.answer = function (q) { return (window.QKEY || {})[q] || null; };
   /* 문제 번호 = 이미지 번호 (1~16) */
-  Q.isQuiz = function (idx) { return idx > 0 && idx < Q.count() - 1; };
+  Q.isQuiz = function (idx) { return idx > 0 && idx <= Q.count() - 1; };
 
   var ANS = function () { return C.COLLECTION + '_ans'; };
 
@@ -241,10 +241,9 @@
   /* 한 사람의 점수: 맞힌 사람 수. 본인 이야기는 자동으로 맞힌 것으로 칩니다 */
   Q.scoreOf = function (d) {
     var picks = d.picks || {}, n = 0;
-    for (var q = 1; q <= Q.count() - 2; q++) {
+    for (var q = 1; q <= Q.count() - 1; q++) {
       var a = Q.answer(q);
       if (!a) continue;
-      if (d.name && a === d.name) { n++; continue; }
       if (picks[q] && picks[q] === a) n++;
     }
     return n;
@@ -299,12 +298,37 @@
   };
 
   /* 정답 공개 상태 — 진행자가 묶음별로 켭니다 */
-  Q.setReveal = function (gi, on) {
+  /* 정답 공개 — 한 번 공개하면 되돌릴 수 없습니다.
+     공개하는 순간 그 문제의 정답만 참가자에게 전달됩니다. */
+  Q.reveal = function (gi) {
     if (!db) return Promise.resolve();
-    var o = {}; o['rev.' + gi] = !!on; o.updatedAt = Date.now();
-    return db.doc(DOC()).set({ rev: {} }, { merge: true })
+    var map = {};
+    Q.group(gi).forEach(function (q) { if (Q.isQuiz(q)) map[q] = Q.answer(q); });
+    var o = {};
+    o['rev.' + gi] = true;
+    o['ans.' + gi] = map;
+    o.updatedAt = Date.now();
+    return db.doc(DOC()).set({ rev: {}, ans: {} }, { merge: true })
       .then(function () { return db.doc(DOC()).update(o); })
       .catch(function () { Q.net(false); });
+  };
+
+  /* 점수판은 진행자 화면이 계산해 올리고, 참가자는 그것만 읽습니다 */
+  Q.publishBoard = function (rows) {
+    if (!db) return Promise.resolve();
+    return db.doc(C.COLLECTION + '/board')
+      .set({ rows: rows.map(function (r) { return { name: r.name, score: r.score }; }),
+             at: Date.now() })
+      .catch(function () {});
+  };
+  Q.watchBoard = function (fn) {
+    Q.ready.then(function () {
+      if (!db) return;
+      db.doc(C.COLLECTION + '/board').onSnapshot(function (s) {
+        var d = s.exists ? (s.data() || {}) : {};
+        fn(d.rows || []);
+      }, function () {});
+    });
   };
 
   /* ---------------- 이미지 미리 받기 ---------------- */
