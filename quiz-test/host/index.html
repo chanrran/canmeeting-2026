@@ -78,6 +78,7 @@
 
   function title(k) {
     if (Q.isRank(k)) return Q.isFinalRank(k) ? '최종 순위' : '중간 순위';
+    if (Q.isName(k)) return '이름 고르기';
     var g = G[k];
     if (g[0] === 0) return '표지';
     if (g[0] === LAST) return '종료';
@@ -138,7 +139,7 @@
   var glistEl = document.getElementById('glist');
 
   function fill(el, k) {
-    if (Q.isRank(k)) {
+    if (Q.isRank(k) || Q.isName(k)) {
       el.className = 'shots n1';
       el.innerHTML = '<div class="stage" style="background:#16161a;display:flex;' +
         'align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700">' +
@@ -157,7 +158,7 @@
     if (gi + 1 < G.length) { nxt.parentElement.style.display = ''; fill(nxt, gi + 1); }
     else { nxt.parentElement.style.display = 'none'; }
     var g = Q.group(gi);
-    if (Q.isRank(gi)) { pos.textContent = title(gi); posn.textContent = ''; }
+    if (Q.isRank(gi) || Q.isName(gi)) { pos.textContent = title(gi); posn.textContent = ''; }
     else if (g[0] === 0) { pos.textContent = '표지'; posn.textContent = ''; }
     else if (g[0] === LAST) { pos.textContent = '종료'; posn.textContent = ''; }
     else {
