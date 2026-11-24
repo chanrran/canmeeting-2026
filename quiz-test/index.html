@@ -21,7 +21,7 @@
   #land { position:absolute; top:50%; left:50%;
           width:calc(100% * 16 / 9); height:calc(100% * 9 / 16);
           transform:translate(-50%, -50%) rotate(90deg); pointer-events:none; }
-  #obox { position:absolute; right:3.5%; top:50%; transform:translateY(-50%);
+  #obox { position:absolute; right:3.5%; bottom:6%;
           width:21%; pointer-events:auto;
           background:rgba(255,255,255,.95); border:2px solid #1b1b1f; border-radius:12px;
           padding:10px 8px; text-align:center; color:#1b1b1f;
@@ -69,17 +69,26 @@
   .pk:disabled { opacity:.95; }
 
   #sheet { position:fixed; inset:0; background:rgba(0,0,0,.94); z-index:20; display:none; }
-  #sheetland { position:absolute; top:50%; left:50%; width:100vh; height:100vw;
-               transform:translate(-50%, -50%) rotate(90deg);
-               display:flex; flex-direction:column; padding:14px 18px; }
+  #sheetland { position:absolute; inset:0; display:flex; flex-direction:column;
+               padding:16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  #sheet.land #sheetland { inset:auto; top:50%; left:50%; width:100vh; height:100vw;
+               transform:translate(-50%, -50%) rotate(90deg); padding:14px 18px; }
   #sheet h2 { font-size:16px; margin:4px 0 12px; font-weight:700; }
-  #sheet .grid { flex:1; overflow:auto; display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; align-content:start; }
+  #sheet .grid { flex:1; overflow:auto; display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; align-content:start; }
+  #sheet.land .grid { grid-template-columns:repeat(4, 1fr); }
   #sheet .grid button { font:inherit; font-size:16px; font-weight:600; color:#fff; background:#1d1d23;
        border:1px solid #35353e; border-radius:10px; padding:16px 6px; touch-action:manipulation; }
   #sheet .grid button.on { background:#8a6a3b; border-color:#b08c50; }
   #sheet .close { margin-top:10px; font:inherit; font-size:15px; font-weight:600; color:#c9c9d0;
        background:#1d1d23; border:1px solid #35353e; border-radius:10px; padding:14px; }
 
+  #namepage { display:none; padding:30px 22px; text-align:center; }
+  #namepage h2 { font-size:20px; margin:0 0 8px; font-weight:700; }
+  #namepage p { font-size:14px; color:#9a9aa2; margin:0 0 26px; line-height:1.8; }
+  #namepage button { font:inherit; font-size:20px; font-weight:700; color:#1b1b1f;
+        background:#fff; border:none; border-radius:14px; padding:20px 30px; width:100%;
+        touch-action:manipulation; }
+  #namepage .ok { font-size:14px; color:#9ad0a0; margin-top:18px; line-height:1.8; }
   #rank { display:none; padding:26px 20px; overflow:auto; text-align:center; }
   #rank h2 { font-size:15px; color:#a79069; letter-spacing:.1em; margin:0 0 18px; }
   #rank .top { background:#16161a; border:1px solid #2c2c33; border-radius:12px;
@@ -111,6 +120,7 @@
         <button id="lname" type="button"></button>
       </div>
     </div>
+    <div id="namepage"></div>
     <div id="rank"></div>
   </div>
   <div id="bar"></div>
@@ -120,15 +130,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="config.js?v=8"></script>
+<script src="app.js?v=8"></script>
 <script>
 (function () {
   'use strict';
   var E = function (id) { return document.getElementById(id); };
   var img = E('shot'), load = E('load'), pg = E('pg'), bar = E('bar'),
       sheet = E('sheet'), rank = E('rank'), frame = E('frame'), obox = E('obox'),
-      lnav = E('lnav'), lname = E('lname');
+      lnav = E('lnav'), lname = E('lname'), namepage = E('namepage');
   var gi = 0, off = 0, started = false, revealed = {}, rows = [];
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); };
@@ -142,6 +152,7 @@
       names.map(function (n) {
         return '<button data-n="' + esc(n) + '"' + (n === cur ? ' class="on"' : '') + '>' + esc(n) + '</button>';
       }).join('') + '</div><button class="close">닫기</button></div>';
+    sheet.className = (q === 'me') ? '' : 'land';
     sheet.style.display = 'block';
     sheet.querySelector('.close').onclick = function () { sheet.style.display = 'none'; };
     sheet.querySelectorAll('.grid button').forEach(function (b) {
@@ -160,12 +171,25 @@
     if (off > g.length - 1) off = g.length - 1;
     if (off < 0) off = 0;
 
-    var isRank = Q.isRank(gi);
+    var isRank = Q.isRank(gi), isName = Q.isName(gi);
     var isCover = (!isRank && g[0] === 0), isEnd = (!isRank && g[0] === Q.count() - 1);
 
     if (!started) { started = true; load.style.display = 'none'; frame.style.display = 'inline-block'; Q.preloadAround(g[0]); }
 
-    if (isRank) { frame.style.display = 'none'; rank.style.display = 'block'; bar.style.display = 'none'; drawRank(); return; }
+    if (isName) {
+      frame.style.display = 'none'; rank.style.display = 'none'; bar.style.display = 'none';
+      lnav.style.display = 'none'; namepage.style.display = 'block';
+      namepage.innerHTML = '<h2>본인 이름을 골라 주세요</h2>' +
+        '<p>이 이름으로 점수가 쌓입니다.<br>잘못 고르면 다시 눌러 바꿀 수 있습니다.</p>' +
+        '<button id="np">' + (Q.me ? esc(Q.me) : '이름 고르기') + '</button>' +
+        (Q.me ? '<div class="ok">' + esc(Q.me) + '님으로 참여합니다</div>' : '');
+      E('np').onclick = function () { openSheet('me'); };
+      if (Q.onBeat) Q.onBeat();
+      return;
+    }
+    namepage.style.display = 'none';
+    if (isRank) { frame.style.display = 'none'; rank.style.display = 'block'; bar.style.display = 'none';
+                  lnav.style.display = 'none'; drawRank(); return; }
     rank.style.display = 'none'; frame.style.display = 'inline-block';
     img.src = Q.src(g[off]);
 
@@ -188,14 +212,10 @@
     var html = '';
     if (isCover) {
       html = '';
-      lname.style.display = 'block';
-      lname.className = Q.me ? 'done' : '';
-      lname.innerHTML = '<small>' + (Q.me ? '내 이름 · 바꾸려면 누르세요' : '시작하기 전에') + '</small>' +
-                        (Q.me ? esc(Q.me) : '내 이름 고르기');
+      lname.style.display = 'none';
     } else {
       lname.style.display = 'none';
-      if (!Q.me) { lname.style.display = 'block'; lname.className = '';
-        lname.innerHTML = '<small>먼저</small>내 이름 고르기'; }
+
     }
     bar.innerHTML = html;
     bar.style.display = html ? 'block' : 'none';
