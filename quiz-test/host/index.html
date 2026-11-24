@@ -64,8 +64,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=2"></script>
-<script src="../app.js?v=2"></script>
+<script src="../config.js?v=4"></script>
+<script src="../app.js?v=4"></script>
 <script>
 (function () {
   'use strict';
@@ -77,17 +77,18 @@
   var QR = Q.qrDataUrl(PURL);
 
   function title(k) {
+    if (Q.isRank(k)) return Q.isFinalRank(k) ? '최종 순위' : '중간 순위';
     var g = G[k];
     if (g[0] === 0) return '표지';
     if (g[0] === LAST) return '종료';
-    return g.map(function (x) { return x; }).join(', ') + '번';
+    return g.join(', ') + '번';
   }
 
   var glist = '';
   for (var k = 0; k < G.length; k++) {
-    var ims = G[k].map(function (x) {
+    var ims = Q.group(k).map(function (x) {
       return '<span class="im"><img src="' + Q.src(x) + '" alt=""></span>';
-    }).join('');
+    }).join('') || '<span class="im" style="background:#efece6"></span>';
     glist += '<button class="gbtn" data-g="' + k + '"><span class="t">' + title(k) +
              '</span><span class="ims">' + ims + '</span></button>';
   }
@@ -137,7 +138,14 @@
   var glistEl = document.getElementById('glist');
 
   function fill(el, k) {
-    var g = G[k] || [];
+    if (Q.isRank(k)) {
+      el.className = 'shots n1';
+      el.innerHTML = '<div class="stage" style="background:#16161a;display:flex;' +
+        'align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700">' +
+        title(k) + '</div>';
+      return;
+    }
+    var g = Q.group(k);
     el.className = 'shots n' + Math.min(3, g.length);
     el.innerHTML = g.map(function (x) {
       return '<div class="stage"><img src="' + Q.src(x) + '" alt=""></div>';
@@ -148,12 +156,13 @@
     fill(shots, gi);
     if (gi + 1 < G.length) { nxt.parentElement.style.display = ''; fill(nxt, gi + 1); }
     else { nxt.parentElement.style.display = 'none'; }
-    var g = G[gi];
-    if (g[0] === 0) { pos.textContent = '표지'; posn.textContent = ''; }
+    var g = Q.group(gi);
+    if (Q.isRank(gi)) { pos.textContent = title(gi); posn.textContent = ''; }
+    else if (g[0] === 0) { pos.textContent = '표지'; posn.textContent = ''; }
     else if (g[0] === LAST) { pos.textContent = '종료'; posn.textContent = ''; }
     else {
       pos.textContent = title(gi);
-      posn.textContent = '· 전체 ' + (G.length - 2) + '문제 중 ' + Q.quizNo(gi) + '번째' +
+      posn.textContent = '· 전체 ' + Q.quizTotal() + '문제 중 ' + Q.quizNo(gi) + '번째' +
                          (g.length > 1 ? ' · ' + g.length + '명을 한 번에' : '');
     }
     document.getElementById('prev').disabled = (gi <= 0);
@@ -183,13 +192,12 @@
   var revMap = {};
   var revBtn = document.getElementById('rev');
   revBtn.onclick = function () {
-    var g = G[gi];
-    if (g[0] === 0 || g[0] === LAST) return;
+    if (!Q.isQuizGroup(gi)) return;
     Q.setReveal(gi, !revMap[gi]);
   };
   function paintRev() {
-    var g = G[gi];
-    var off = (g[0] === 0 || g[0] === LAST);
+    var g = Q.group(gi);
+    var off = !Q.isQuizGroup(gi);
     revBtn.disabled = off;
     revBtn.textContent = off ? '정답 공개' : (revMap[gi] ? '정답 숨기기' : '정답 공개');
     revBtn.style.background = (!off && revMap[gi]) ? '#2e6b3f' : '#fff';
