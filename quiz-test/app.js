@@ -20,7 +20,7 @@
   Q.isRank = function (gi) { return G[Q.clampG(gi)] === 'RANK'; };
   Q.isName = function (gi) { return G[Q.clampG(gi)] === 'NAME'; };
   Q.isFinalRank = function (gi) { return Q.isRank(gi) && Q.clampG(gi) === G.length - 1; };
-  Q.group = function (gi) { var g = G[Q.clampG(gi)]; return (g && g.length && g !== 'RANK') ? g : []; };
+  Q.group = function (gi) { var g = G[Q.clampG(gi)]; return (Array.isArray(g) && g.length) ? g : []; };
   Q.clampG = function (gi) {
     gi = Number(gi);
     if (!isFinite(gi)) gi = 0;
