@@ -34,6 +34,12 @@
   #lnav button:disabled { opacity:.32; }
   #lnav span { font-size:12px; font-weight:700; color:#1b1b1f;
           background:rgba(255,255,255,.92); border-radius:999px; padding:7px 11px; }
+  #lname { position:absolute; left:50%; bottom:7%; transform:translateX(-50%);
+          display:none; pointer-events:auto; font:inherit; font-weight:700; font-size:17px;
+          color:#fff; background:#1b1b1f; border:2px solid #1b1b1f; border-radius:12px;
+          padding:14px 26px; touch-action:manipulation; }
+  #lname.done { background:rgba(255,255,255,.95); color:#1b1b1f; }
+  #lname small { display:block; font-size:11px; font-weight:600; color:#a79069; margin-bottom:3px; }
   #obox .t { font-size:11px; color:#8a6a3b; letter-spacing:.06em; margin-bottom:5px; }
   #obox .v { font-size:17px; line-height:1.3; }
   #obox.done { background:rgba(236,246,235,.97); border-color:#3f6b33; }
@@ -62,10 +68,12 @@
   .pk.self { background:#2b2720; border-color:#5a4c33; color:#e4cf9f; }
   .pk:disabled { opacity:.95; }
 
-  #sheet { position:fixed; inset:0; background:rgba(0,0,0,.93); z-index:20; display:none;
-           flex-direction:column; padding:16px 14px calc(16px + env(safe-area-inset-bottom)); }
+  #sheet { position:fixed; inset:0; background:rgba(0,0,0,.94); z-index:20; display:none; }
+  #sheetland { position:absolute; top:50%; left:50%; width:100vh; height:100vw;
+               transform:translate(-50%, -50%) rotate(90deg);
+               display:flex; flex-direction:column; padding:14px 18px; }
   #sheet h2 { font-size:16px; margin:4px 0 12px; font-weight:700; }
-  #sheet .grid { flex:1; overflow:auto; display:grid; grid-template-columns:1fr 1fr; gap:8px; align-content:start; }
+  #sheet .grid { flex:1; overflow:auto; display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; align-content:start; }
   #sheet .grid button { font:inherit; font-size:16px; font-weight:600; color:#fff; background:#1d1d23;
        border:1px solid #35353e; border-radius:10px; padding:16px 6px; touch-action:manipulation; }
   #sheet .grid button.on { background:#8a6a3b; border-color:#b08c50; }
@@ -100,6 +108,7 @@
           <span id="cnt"></span>
           <button id="fwd" type="button">다음 ▶</button>
         </div>
+        <button id="lname" type="button"></button>
       </div>
     </div>
     <div id="rank"></div>
@@ -111,14 +120,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script src="app.js?v=6"></script>
 <script>
 (function () {
   'use strict';
   var E = function (id) { return document.getElementById(id); };
   var img = E('shot'), load = E('load'), pg = E('pg'), bar = E('bar'),
-      sheet = E('sheet'), rank = E('rank'), frame = E('frame'), obox = E('obox'), lnav = E('lnav');
+      sheet = E('sheet'), rank = E('rank'), frame = E('frame'), obox = E('obox'),
+      lnav = E('lnav'), lname = E('lname');
   var gi = 0, off = 0, started = false, revealed = {}, rows = [];
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); };
@@ -127,12 +137,12 @@
   function openSheet(q) {
     var names = Q.names();
     var cur = (q === 'me') ? Q.me : Q.myPicks[q];
-    sheet.innerHTML = '<h2>' + (q === 'me' ? '본인 이름을 골라 주세요'
+    sheet.innerHTML = '<div id="sheetland"><h2>' + (q === 'me' ? '본인 이름을 골라 주세요'
                        : q + '번은 누구일까요?') + '</h2><div class="grid">' +
       names.map(function (n) {
         return '<button data-n="' + esc(n) + '"' + (n === cur ? ' class="on"' : '') + '>' + esc(n) + '</button>';
-      }).join('') + '</div><button class="close">닫기</button>';
-    sheet.style.display = 'flex';
+      }).join('') + '</div><button class="close">닫기</button></div>';
+    sheet.style.display = 'block';
     sheet.querySelector('.close').onclick = function () { sheet.style.display = 'none'; };
     sheet.querySelectorAll('.grid button').forEach(function (b) {
       b.onclick = function () {
@@ -177,10 +187,15 @@
 
     var html = '';
     if (isCover) {
-      html = '<div class="picks"><button class="pk' + (Q.me ? ' done' : '') + '" id="me"><b>내 이름</b>' +
-             (Q.me ? esc(Q.me) : '눌러서 고르기') + '</button></div>';
+      html = '';
+      lname.style.display = 'block';
+      lname.className = Q.me ? 'done' : '';
+      lname.innerHTML = '<small>' + (Q.me ? '내 이름 · 바꾸려면 누르세요' : '시작하기 전에') + '</small>' +
+                        (Q.me ? esc(Q.me) : '내 이름 고르기');
     } else {
-      if (!Q.me) html += '<div class="picks"><button class="pk" id="me"><b>내 이름</b>눌러서 고르기</button></div>';
+      lname.style.display = 'none';
+      if (!Q.me) { lname.style.display = 'block'; lname.className = '';
+        lname.innerHTML = '<small>먼저</small>내 이름 고르기'; }
     }
     bar.innerHTML = html;
     bar.style.display = html ? 'block' : 'none';
@@ -220,6 +235,7 @@
     setTimeout(function () { if (img.getAttribute('src') === want) img.src = want; }, 1500);
   };
 
+  lname.onclick = function () { openSheet('me'); };
   E('back').onclick = function () { off--; paint(); };
   E('fwd').onclick = function () { off++; paint(); };
 
