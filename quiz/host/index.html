@@ -53,8 +53,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="../../qrcode.js"></script>
-<script src="../config.js?v=7"></script>
-<script src="../app.js?v=7"></script>
+<script src="../config.js?v=8"></script>
+<script src="../app.js?v=8"></script>
 <script>
 (function () {
   'use strict';
@@ -120,7 +120,7 @@
     if (cur + 1 < N) { nxt.style.display = 'block'; nxt.src = Q.src(cur + 1); }
     else { nxt.style.display = 'none'; }
     pos.textContent = (cur + 1);
-    posn.textContent = '/ ' + N + (cur === 0 ? ' · 표지' : '');
+    posn.textContent = '/ ' + N + (cur === 0 ? ' · 표지' : (cur === N - 1 ? ' · 종료' : ' · ' + cur + '번 문제'));
     document.getElementById('prev').disabled = (cur <= 0);
     document.getElementById('next').disabled = (cur >= N - 1);
     var bs = grid.querySelectorAll('button');
