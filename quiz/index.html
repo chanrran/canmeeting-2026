@@ -41,8 +41,8 @@
           padding:14px 26px; touch-action:manipulation; }
   #lname.done { background:rgba(255,255,255,.95); color:#1b1b1f; }
   #lname small { display:block; font-size:11px; font-weight:600; color:#a79069; margin-bottom:3px; }
-  #obox .t { font-size:8.5px; color:#8a6a3b; letter-spacing:0; margin-bottom:2px; }
-  #obox .v { font-size:12px; line-height:1.25; }
+  #obox .t { display:none; }
+  #obox .v { font-size:18px; line-height:1.2; }
   #obox.done { background:rgba(236,246,235,.97); border-color:#3f6b33; }
   #obox.ok { background:rgba(224,244,220,.97); border-color:#2e6b3f; }
   #obox.no { background:rgba(250,228,228,.97); border-color:#a33; }
@@ -143,8 +143,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=14"></script>
-<script src="app.js?v=14"></script>
+<script src="config.js?v=15"></script>
+<script src="app.js?v=15"></script>
 <script>
 (function () {
   'use strict';
@@ -221,7 +221,7 @@
       else if (rev) { cls = (mine && mine === a) ? 'ok' : 'no'; v = (mine || '미응답') + '<br>정답 ' + a; }
       else { v = mine || '고르기'; if (mine) cls = 'done'; }
       obox.className = cls;
-      obox.innerHTML = '<div class="t">' + qn + '번은 누구?</div><div class="v">' + v + '</div>';
+      obox.innerHTML = '<div class="v">' + v + '</div>';
       obox.disabled = (!Q.me || rev || (a && a === Q.me));
       obox.onclick = function () { openSheet(qn); };
     }
