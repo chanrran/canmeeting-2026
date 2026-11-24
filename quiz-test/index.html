@@ -80,6 +80,9 @@
   #sheet .grid button { font:inherit; font-size:16px; font-weight:600; color:#fff; background:#1d1d23;
        border:1px solid #35353e; border-radius:10px; padding:16px 6px; touch-action:manipulation; }
   #sheet .grid button.on { background:#8a6a3b; border-color:#b08c50; }
+  #sheet .grid button.busy { opacity:.33; }
+  #sheet .grid button span { display:block; font-size:10px; font-weight:600;
+        color:#a79069; margin-top:3px; }
   #sheet .close { margin:10px auto 0; align-self:center; font:inherit; font-size:15px;
        font-weight:600; color:#c9c9d0; background:#1d1d23; border:1px solid #35353e;
        border-radius:10px; padding:13px 44px; }
@@ -140,8 +143,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="config.js?v=13"></script>
+<script src="app.js?v=13"></script>
 <script>
 (function () {
   'use strict';
@@ -160,7 +163,11 @@
     sheet.innerHTML = '<div id="sheetland"><h2>' + (q === 'me' ? '본인 이름을 골라 주세요'
                        : q + '번은 누구일까요?') + '</h2><div class="grid">' +
       names.map(function (n) {
-        return '<button data-n="' + esc(n) + '"' + (n === cur ? ' class="on"' : '') + '>' + esc(n) + '</button>';
+        var owner = (q === 'me') ? Q.taken[n] : null;
+        var busy = !!owner && owner !== Q.myId();
+        return '<button data-n="' + esc(n) + '"' +
+               (n === cur ? ' class="on"' : (busy ? ' class="busy" disabled' : '')) + '>' +
+               esc(n) + (busy ? '<span>이미 선택됨</span>' : '') + '</button>';
       }).join('') + '</div><button class="close">닫기</button></div>';
     sheet.className = 'land';
     sheet.style.display = 'block';
@@ -251,7 +258,7 @@
       return;
     }
     var h = '<div id="rkland"><h2>' + ttl + '</h2><div class="tops">';
-    rows.slice(0, fin ? 2 : 3).forEach(function (r, i) {
+    rows.slice(0, 2).forEach(function (r, i) {
       h += '<div class="top"><div class="n">' + (i + 1) + '등</div><div class="w">' +
            esc(r.name) + '</div><div class="s">' + r.score + '점</div></div>';
     });
